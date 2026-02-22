@@ -92,7 +92,8 @@ impl App for StudioApp {
         // Draw rectangles (solid only in v0).
         self.rect_renderer.render(&rctx, &mut target, &mut self.draw_list);
 
-        // Present.
+        // Present (Wayland requires pre-present notification to properly drive frame callbacks).
+        ctx.window.window.pre_present_notify();
         ctx.gpu.submit(frame);
 
         AppControl::Continue

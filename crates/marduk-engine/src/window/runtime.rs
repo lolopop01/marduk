@@ -126,12 +126,17 @@ where
         config: RuntimeConfig,
     ) -> Result<WindowId> {
         let attrs = Window::default_attributes()
+            .with_visible(true)
             .with_title(config.title)
             .with_inner_size(config.initial_size);
 
         let window = event_loop
             .create_window(attrs)
             .context("failed to create window")?;
+
+        window.set_visible(true);
+        window.request_redraw();
+        // Do not focus or request attention here; defer to resumed
 
         let id = window.id();
         let gpu_init = self.gpu_init.clone();
@@ -205,7 +210,9 @@ where
         }
 
         for entry in self.windows.values() {
-            entry.with_window(|w| w.request_redraw());
+            entry.with_window(|w| {
+                w.request_redraw();
+            });
         }
     }
 
@@ -220,7 +227,10 @@ where
         // Bootstrap behavior: continuous redraw.
         // Later: invalidation-based redraw from UI.
         for entry in self.windows.values() {
-            entry.with_window(|w| w.request_redraw());
+            entry.with_window(|w| {
+                w.pre_present_notify();
+                w.request_redraw();
+            });
         }
     }
 
@@ -277,7 +287,10 @@ where
             WindowEvent::Resized(new_size) => {
                 if let Some(entry) = self.windows.get_mut(&window_id) {
                     entry.with_gpu_mut(|gpu| gpu.resize(*new_size));
-                    entry.with_window(|w| w.request_redraw());
+                    entry.with_window(|w| {
+                        w.pre_present_notify();
+                        w.request_redraw();
+                    });
                 }
             }
 
@@ -285,7 +298,10 @@ where
                 if let Some(entry) = self.windows.get_mut(&window_id) {
                     let new_size = entry.with_window(|w| w.inner_size());
                     entry.with_gpu_mut(|gpu| gpu.resize(new_size));
-                    entry.with_window(|w| w.request_redraw());
+                    entry.with_window(|w| {
+                        w.pre_present_notify();
+                        w.request_redraw();
+                    });
                 }
             }
 
