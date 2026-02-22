@@ -36,7 +36,7 @@ impl App for StudioApp {
 
         // Clear pass.
         {
-            let mut rpass = frame.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let rpass = frame.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("marduk-studio clear"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &frame.view,

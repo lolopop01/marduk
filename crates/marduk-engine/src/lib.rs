@@ -9,3 +9,7 @@ pub mod time;
 pub mod core;
 
 pub mod logging;
+pub mod coords;
+pub mod render;
+pub mod paint;
+mod scene;
