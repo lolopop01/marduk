@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 marduk-engine = { path = "../marduk-engine" }
 marduk-ui = { path = "../marduk-ui" }
+anyhow = "1.0.102"
