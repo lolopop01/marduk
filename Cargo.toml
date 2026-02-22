@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "crates/marduk-engine",
+  "crates/marduk-ui",
+]
+resolver = "2"
