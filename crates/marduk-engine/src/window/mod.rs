@@ -4,4 +4,4 @@
 
 mod runtime;
 
-pub use runtime::{RunControl, Runtime, RuntimeConfig, RuntimeCtx};
+pub use runtime::{Runtime, RuntimeConfig, RuntimeCtx};
