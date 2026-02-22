@@ -4,6 +4,7 @@
 //! Runtime code is responsible for translating platform events into `InputEvent`s.
 
 mod frame;
+pub(crate) mod platform;
 mod state;
 mod types;
 
