@@ -72,8 +72,7 @@ impl DrawList {
             self.rebuild_sorted_indices();
         }
 
-        let items_ptr: *const Vec<DrawItem> = &self.items;
-        self.sorted_indices.iter().map(move |&i| unsafe { &(*items_ptr)[i] })
+        self.sorted_indices.iter().map(|&i| &self.items[i])
     }
 
     fn rebuild_sorted_indices(&mut self) {

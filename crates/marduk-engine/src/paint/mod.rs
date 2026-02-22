@@ -6,8 +6,10 @@
 //!
 //! Geometry types remain in `coords`.
 
-mod color;
-mod paint;
+pub mod color;
+pub mod paint;
 pub mod gradient;
 
 pub use color::Color;
+
+pub use paint::Paint;

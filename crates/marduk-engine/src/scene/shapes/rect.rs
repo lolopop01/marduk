@@ -1,6 +1,5 @@
 use crate::coords::Rect;
 use crate::paint::{Color, Paint};
-
 use crate::scene::{DrawCmd, DrawList, ZIndex};
 
 /// Rectangle draw payload.

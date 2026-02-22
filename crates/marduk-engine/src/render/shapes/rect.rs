@@ -1,8 +1,9 @@
+use bytemuck::{Pod, Zeroable};
+use wgpu::util::DeviceExt;
+
 use crate::paint::Paint;
 use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
-
-use bytemuck::{Pod, Zeroable};
 
 /// Rectangle renderer (solid fill only for v0).
 ///
@@ -22,7 +23,6 @@ pub struct RectRenderer {
     instance_vbo: Option<wgpu::Buffer>,
     instance_capacity: usize,
 
-    // Set to true once a non-solid paint is encountered (avoid log spam).
     warned_non_solid: bool,
 }
 
@@ -53,26 +53,26 @@ impl RectRenderer {
     /// Supported:
     /// - `DrawCmd::Rect` with `Paint::Solid`
     ///
-    /// Unsupported paints are ignored (with one-time warning hook).
-    pub fn render(&mut self, ctx: &RenderCtx<'_>, target: &mut RenderTarget<'_>, draw_list: &mut DrawList) {
+    /// Unsupported paints are ignored (one-time debug message).
+    pub fn render(
+        &mut self,
+        ctx: &RenderCtx<'_>,
+        target: &mut RenderTarget<'_>,
+        draw_list: &mut DrawList,
+    ) {
         self.ensure_pipeline(ctx);
         self.ensure_static_buffers(ctx);
         self.ensure_bindings(ctx);
 
-        let Some(pipeline) = self.pipeline.as_ref() else { return; };
-        let Some(bind_group) = self.bind_group.as_ref() else { return; };
-        let Some(quad_vbo) = self.quad_vbo.as_ref() else { return; };
-        let Some(quad_ibo) = self.quad_ibo.as_ref() else { return; };
-
         // Build instance data from draw list in paint order.
-        // No heap allocation besides the Vec itself; callers can reuse a Vec in the future if needed.
         let mut instances: Vec<RectInstance> = Vec::new();
 
         for item in draw_list.iter_in_paint_order() {
+            // Future-proof: keep this match even if only Rect exists today.
+            #[allow(unreachable_patterns)]
             match &item.cmd {
                 DrawCmd::Rect(cmd) => match &cmd.paint {
                     Paint::Solid(c) => {
-                        // Skip empty rects early.
                         let r = cmd.rect.normalized();
                         if r.is_empty() {
                             continue;
@@ -99,17 +99,21 @@ impl RectRenderer {
             return;
         }
 
-        // Upload viewport uniform (logical px).
+        // Mutating methods must happen before borrowing pipeline/buffers immutably.
         self.write_viewport_uniform(ctx);
-
-        // Upload instance buffer (resized if needed).
         self.ensure_instance_capacity(ctx, instances.len());
+
         let Some(instance_vbo) = self.instance_vbo.as_ref() else { return; };
 
         ctx.queue
             .write_buffer(instance_vbo, 0, bytemuck::cast_slice(&instances));
 
-        // Draw pass.
+        // Now take immutable borrows.
+        let Some(pipeline) = self.pipeline.as_ref() else { return; };
+        let Some(bind_group) = self.bind_group.as_ref() else { return; };
+        let Some(quad_vbo) = self.quad_vbo.as_ref() else { return; };
+        let Some(quad_ibo) = self.quad_ibo.as_ref() else { return; };
+
         let mut rpass = target.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("marduk rect pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -132,8 +136,6 @@ impl RectRenderer {
         rpass.set_vertex_buffer(0, quad_vbo.slice(..));
         rpass.set_vertex_buffer(1, instance_vbo.slice(..));
         rpass.set_index_buffer(quad_ibo.slice(..), wgpu::IndexFormat::Uint16);
-
-        // 6 indices per quad, instanced per rect.
         rpass.draw_indexed(0..6, 0, 0..instances.len() as u32);
     }
 
@@ -148,53 +150,58 @@ impl RectRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_src.into()),
         });
 
-        let bind_group_layout = ctx
-            .device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("marduk rect bgl"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(
-                            std::num::NonZeroU64::new(std::mem::size_of::<ViewportUniform>() as u64)
-                                .unwrap(),
-                        ),
-                    },
-                    count: None,
-                }],
-            });
+        let bind_group_layout =
+            ctx.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("marduk rect bgl"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: Some(
+                                std::num::NonZeroU64::new(
+                                    std::mem::size_of::<ViewportUniform>() as u64,
+                                )
+                                    .unwrap(),
+                            ),
+                        },
+                        count: None,
+                    }],
+                });
 
-        let pipeline_layout = ctx
-            .device
-            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("marduk rect pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout],
-                push_constant_ranges: &[],
-            });
+        let pipeline_layout =
+            ctx.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("marduk rect pipeline layout"),
+                    bind_group_layouts: &[&bind_group_layout],
+                    // Newer wgpu uses immediate constants; keep disabled for now.
+                    immediate_size: 0,
+                });
 
         let pipeline = ctx.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("marduk rect pipeline"),
             layout: Some(&pipeline_layout),
+
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: "vs_main",
-                buffers: &[
-                    QuadVertex::layout(),
-                    RectInstance::layout(),
-                ],
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[QuadVertex::layout(), RectInstance::layout()],
             },
+
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: ctx.surface_format,
                     blend: Some(premul_alpha_blend()),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
+
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
@@ -204,16 +211,19 @@ impl RectRenderer {
                 unclipped_depth: false,
                 conservative: false,
             },
+
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+
+            // Newer wgpu field names:
+            multiview_mask: None,
+            cache: None,
         });
 
         self.pipeline_format = Some(ctx.surface_format);
         self.pipeline = Some(pipeline);
         self.bind_group_layout = Some(bind_group_layout);
 
-        // Force re-bind creation on next call.
         self.bind_group = None;
         self.viewport_ubo = None;
     }
@@ -249,7 +259,6 @@ impl RectRenderer {
             return;
         }
 
-        // Unit quad vertices (0..1) in local rect space.
         let quad = [
             QuadVertex { pos: [0.0, 0.0] },
             QuadVertex { pos: [1.0, 0.0] },
@@ -278,7 +287,6 @@ impl RectRenderer {
     fn write_viewport_uniform(&mut self, ctx: &RenderCtx<'_>) {
         let Some(ubo) = self.viewport_ubo.as_ref() else { return; };
 
-        // Guard against invalid viewport.
         let w = ctx.viewport.width.max(1.0);
         let h = ctx.viewport.height.max(1.0);
 
@@ -295,7 +303,6 @@ impl RectRenderer {
             return;
         }
 
-        // Growth policy: next power of two to reduce realloc churn.
         let new_cap = required_instances.next_power_of_two().max(64);
         let new_size = (new_cap * std::mem::size_of::<RectInstance>()) as u64;
 
@@ -312,9 +319,6 @@ impl RectRenderer {
 }
 
 fn premul_alpha_blend() -> wgpu::BlendState {
-    // Premultiplied alpha:
-    // out.rgb = src.rgb + dst.rgb*(1-src.a)
-    // out.a   = src.a   + dst.a*(1-src.a)
     wgpu::BlendState {
         color: wgpu::BlendComponent {
             src_factor: wgpu::BlendFactor::One,
@@ -333,8 +337,7 @@ fn premul_alpha_blend() -> wgpu::BlendState {
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 struct ViewportUniform {
     viewport: [f32; 2],
-    // Pad to 16 bytes to satisfy uniform alignment on most backends.
-    _pad: [f32; 2],
+    _pad: [f32; 2], // 16-byte alignment
 }
 
 #[repr(C)]
@@ -344,11 +347,14 @@ struct QuadVertex {
 }
 
 impl QuadVertex {
+    // Static attributes to satisfy `'static` layout references.
+    const ATTRS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x2];
+
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<QuadVertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Float32x2],
+            attributes: &Self::ATTRS,
         }
     }
 }
@@ -356,24 +362,23 @@ impl QuadVertex {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 struct RectInstance {
-    origin: [f32; 2], // logical px
-    size: [f32; 2],   // logical px
-    color: [f32; 4],  // premultiplied RGBA
+    origin: [f32; 2],
+    size: [f32; 2],
+    color: [f32; 4],
 }
 
 impl RectInstance {
+    const ATTRS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+        1 => Float32x2, // origin
+        2 => Float32x2, // size
+        3 => Float32x4  // color
+    ];
+
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<RectInstance>() as u64,
             step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &wgpu::vertex_attr_array![
-                1 => Float32x2, // origin
-                2 => Float32x2, // size
-                3 => Float32x4  // color
-            ],
+            attributes: &Self::ATTRS,
         }
     }
 }
-
-// wgpu util import for create_buffer_init
-use wgpu::util::DeviceExt;
