@@ -1,0 +1,8 @@
+[package]
+name = "marduk-studio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+marduk-engine = { path = "../marduk-engine" }
+marduk-ui = { path = "../marduk-ui" }
