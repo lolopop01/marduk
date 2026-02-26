@@ -1,4 +1,7 @@
+use crate::scene::shapes::circle::CircleCmd;
 use crate::scene::shapes::rect::RectCmd;
+use crate::scene::shapes::rounded_rect::RoundedRectCmd;
+use crate::scene::shapes::text::TextCmd;
 
 /// Renderer-agnostic draw command stream.
 ///
@@ -6,17 +9,11 @@ use crate::scene::shapes::rect::RectCmd;
 /// - add a new shape module under `scene::shapes::*`
 /// - add a new variant here
 /// - implement push helpers inside that shape module
+/// - add a matching renderer under `render::shapes::*`
 #[derive(Debug, Clone, PartialEq)]
 pub enum DrawCmd {
     Rect(RectCmd),
-
-    // Future:
-    // RoundedRect(RoundedRectCmd),
-    // Circle(CircleCmd),
-    // TextRun(TextRunCmd),
-    // Image(ImageCmd),
-    // ClipPush(ClipCmd),
-    // ClipPop,
-    // OpacityPush(OpacityCmd),
-    // OpacityPop,
+    RoundedRect(RoundedRectCmd),
+    Circle(CircleCmd),
+    Text(TextCmd),
 }

@@ -8,11 +8,13 @@
 //! Renderers convert to NDC in shaders using a viewport uniform.
 
 mod color;
+mod corner_radii;
 mod rect;
 mod vec2;
 mod viewport;
 
 pub use color::ColorRgba;
+pub use corner_radii::CornerRadii;
 pub use rect::Rect;
 pub use vec2::Vec2;
 pub use viewport::Viewport;

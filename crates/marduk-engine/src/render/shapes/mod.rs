@@ -1,3 +1,6 @@
-//! Shape renderers (rects, rounded rects, etc.).
+//! Shape renderers.
 
+pub mod circle;
 pub mod rect;
+pub mod rounded_rect;
+pub mod text;

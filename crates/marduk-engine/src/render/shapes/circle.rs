@@ -5,11 +5,14 @@ use crate::paint::Paint;
 use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
 
-/// Rectangle renderer (solid fill only for v0).
+/// Renderer for `DrawCmd::Circle`.
 ///
-/// Geometry is provided as logical pixels, converted to NDC in the vertex shader using viewport.
-/// Color is expected to be linear premultiplied RGBA (`paint::Color`).
-pub struct RectRenderer {
+/// Supported paints:
+/// - `Paint::Solid`
+/// - `Paint::LinearGradient` (2-stop; uses first and last stop for gradients with more stops)
+///
+/// Borders are rendered as an AA ring on the outer edge of the circle.
+pub struct CircleRenderer {
     pipeline_format: Option<wgpu::TextureFormat>,
     pipeline: Option<wgpu::RenderPipeline>,
 
@@ -23,10 +26,10 @@ pub struct RectRenderer {
     instance_vbo: Option<wgpu::Buffer>,
     instance_capacity: usize,
 
-    warned_non_solid: bool,
+    warned_multi_stop: bool,
 }
 
-impl Default for RectRenderer {
+impl Default for CircleRenderer {
     fn default() -> Self {
         Self {
             pipeline_format: None,
@@ -38,22 +41,16 @@ impl Default for RectRenderer {
             quad_ibo: None,
             instance_vbo: None,
             instance_capacity: 0,
-            warned_non_solid: false,
+            warned_multi_stop: false,
         }
     }
 }
 
-impl RectRenderer {
+impl CircleRenderer {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Renders rectangles contained in `draw_list` into `target`.
-    ///
-    /// Supported:
-    /// - `DrawCmd::Rect` with `Paint::Solid`
-    ///
-    /// Unsupported paints are ignored (one-time debug message).
     pub fn render(
         &mut self,
         ctx: &RenderCtx<'_>,
@@ -64,56 +61,51 @@ impl RectRenderer {
         self.ensure_static_buffers(ctx);
         self.ensure_bindings(ctx);
 
-        // Build instance data from draw list in paint order.
-        let mut instances: Vec<RectInstance> = Vec::new();
+        let mut instances: Vec<CircleInstance> = Vec::new();
 
         for item in draw_list.iter_in_paint_order() {
-            match &item.cmd {
-                DrawCmd::Rect(cmd) => match &cmd.paint {
-                    Paint::Solid(c) => {
-                        let r = cmd.rect.normalized();
-                        if r.is_empty() {
-                            continue;
-                        }
+            let DrawCmd::Circle(cmd) = &item.cmd else { continue; };
 
-                        instances.push(RectInstance {
-                            origin: [r.origin.x, r.origin.y],
-                            size: [r.size.x, r.size.y],
-                            color: [c.r, c.g, c.b, c.a],
-                        });
-                    }
-                    _ => {
-                        if !self.warned_non_solid {
-                            log::debug!("RectRenderer: non-solid paint encountered; ignored in v0");
-                            self.warned_non_solid = true;
-                        }
-                    }
-                },
-                _ => {}
+            if cmd.radius <= 0.0 {
+                continue;
             }
+
+            let (color0, color1, grad_p0, grad_p1) =
+                resolve_paint(&cmd.paint, &mut self.warned_multi_stop);
+
+            let (border_width, border_color) = match &cmd.border {
+                Some(b) => (b.width.max(0.0), [b.color.r, b.color.g, b.color.b, b.color.a]),
+                None => (0.0, [0.0f32; 4]),
+            };
+
+            instances.push(CircleInstance {
+                center: [cmd.center.x, cmd.center.y],
+                radius_bw: [cmd.radius, border_width],
+                color0,
+                color1,
+                grad_p0,
+                grad_p1,
+                border_color,
+            });
         }
 
         if instances.is_empty() {
             return;
         }
 
-        // Mutating methods must happen before borrowing pipeline/buffers immutably.
         self.write_viewport_uniform(ctx);
         self.ensure_instance_capacity(ctx, instances.len());
 
         let Some(instance_vbo) = self.instance_vbo.as_ref() else { return; };
+        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&instances));
 
-        ctx.queue
-            .write_buffer(instance_vbo, 0, bytemuck::cast_slice(&instances));
-
-        // Now take immutable borrows.
-        let Some(pipeline) = self.pipeline.as_ref() else { return; };
+        let Some(pipeline)   = self.pipeline.as_ref()   else { return; };
         let Some(bind_group) = self.bind_group.as_ref() else { return; };
-        let Some(quad_vbo) = self.quad_vbo.as_ref() else { return; };
-        let Some(quad_ibo) = self.quad_ibo.as_ref() else { return; };
+        let Some(quad_vbo)   = self.quad_vbo.as_ref()   else { return; };
+        let Some(quad_ibo)   = self.quad_ibo.as_ref()   else { return; };
 
         let mut rpass = target.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("marduk rect pass"),
+            label: Some("marduk circle pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target.color_view,
                 resolve_target: None,
@@ -137,58 +129,56 @@ impl RectRenderer {
         rpass.draw_indexed(0..6, 0, 0..instances.len() as u32);
     }
 
+    // ── private helpers ────────────────────────────────────────────────────
+
     fn ensure_pipeline(&mut self, ctx: &RenderCtx<'_>) {
         if self.pipeline_format == Some(ctx.surface_format) && self.pipeline.is_some() {
             return;
         }
 
-        let shader_src = include_str!("shaders/rect.wgsl");
         let shader = ctx.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("marduk rect shader"),
-            source: wgpu::ShaderSource::Wgsl(shader_src.into()),
+            label: Some("marduk circle shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("shaders/circle.wgsl").into(),
+            ),
         });
 
         let bind_group_layout =
-            ctx.device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("marduk rect bgl"),
-                    entries: &[wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: Some(
-                                std::num::NonZeroU64::new(
-                                    std::mem::size_of::<ViewportUniform>() as u64,
-                                )
-                                    .unwrap(),
-                            ),
-                        },
-                        count: None,
-                    }],
-                });
+            ctx.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("marduk circle bgl"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: Some(
+                            std::num::NonZeroU64::new(
+                                std::mem::size_of::<ViewportUniform>() as u64,
+                            )
+                            .unwrap(),
+                        ),
+                    },
+                    count: None,
+                }],
+            });
 
         let pipeline_layout =
-            ctx.device
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("marduk rect pipeline layout"),
-                    bind_group_layouts: &[&bind_group_layout],
-                    // Newer wgpu uses immediate constants; keep disabled for now.
-                    immediate_size: 0,
-                });
+            ctx.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("marduk circle pipeline layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                immediate_size: 0,
+            });
 
         let pipeline = ctx.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("marduk rect pipeline"),
+            label: Some("marduk circle pipeline"),
             layout: Some(&pipeline_layout),
-
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
-                buffers: &[QuadVertex::layout(), RectInstance::layout()],
+                buffers: &[QuadVertex::layout(), CircleInstance::layout()],
             },
-
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some("fs_main"),
@@ -199,7 +189,6 @@ impl RectRenderer {
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
-
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
@@ -209,11 +198,8 @@ impl RectRenderer {
                 unclipped_depth: false,
                 conservative: false,
             },
-
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-
-            // Newer wgpu field names:
             multiview_mask: None,
             cache: None,
         });
@@ -221,7 +207,6 @@ impl RectRenderer {
         self.pipeline_format = Some(ctx.surface_format);
         self.pipeline = Some(pipeline);
         self.bind_group_layout = Some(bind_group_layout);
-
         self.bind_group = None;
         self.viewport_ubo = None;
     }
@@ -233,14 +218,14 @@ impl RectRenderer {
         let Some(bgl) = self.bind_group_layout.as_ref() else { return; };
 
         let viewport_ubo = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("marduk rect viewport ubo"),
+            label: Some("marduk circle viewport ubo"),
             size: std::mem::size_of::<ViewportUniform>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("marduk rect bind group"),
+            label: Some("marduk circle bind group"),
             layout: bgl,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -263,58 +248,86 @@ impl RectRenderer {
             QuadVertex { pos: [1.0, 1.0] },
             QuadVertex { pos: [0.0, 1.0] },
         ];
-
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
 
-        let quad_vbo = ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("marduk rect quad vbo"),
+        self.quad_vbo = Some(ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("marduk circle quad vbo"),
             contents: bytemuck::cast_slice(&quad),
             usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let quad_ibo = ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("marduk rect quad ibo"),
+        }));
+        self.quad_ibo = Some(ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("marduk circle quad ibo"),
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
-        });
-
-        self.quad_vbo = Some(quad_vbo);
-        self.quad_ibo = Some(quad_ibo);
+        }));
     }
 
     fn write_viewport_uniform(&mut self, ctx: &RenderCtx<'_>) {
         let Some(ubo) = self.viewport_ubo.as_ref() else { return; };
-
         let w = ctx.viewport.width.max(1.0);
         let h = ctx.viewport.height.max(1.0);
-
-        let u = ViewportUniform {
-            viewport: [w, h],
-            _pad: [0.0, 0.0],
-        };
-
-        ctx.queue.write_buffer(ubo, 0, bytemuck::bytes_of(&u));
+        ctx.queue.write_buffer(
+            ubo,
+            0,
+            bytemuck::bytes_of(&ViewportUniform { viewport: [w, h], _pad: [0.0; 2] }),
+        );
     }
 
-    fn ensure_instance_capacity(&mut self, ctx: &RenderCtx<'_>, required_instances: usize) {
-        if required_instances <= self.instance_capacity && self.instance_vbo.is_some() {
+    fn ensure_instance_capacity(&mut self, ctx: &RenderCtx<'_>, required: usize) {
+        if required <= self.instance_capacity && self.instance_vbo.is_some() {
             return;
         }
-
-        let new_cap = required_instances.next_power_of_two().max(64);
-        let new_size = (new_cap * std::mem::size_of::<RectInstance>()) as u64;
-
-        let buf = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("marduk rect instance vbo"),
+        let new_cap = required.next_power_of_two().max(64);
+        let new_size = (new_cap * std::mem::size_of::<CircleInstance>()) as u64;
+        self.instance_vbo = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("marduk circle instance vbo"),
             size: new_size,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
-        });
-
-        self.instance_vbo = Some(buf);
+        }));
         self.instance_capacity = new_cap;
     }
 }
+
+// ── paint helpers ──────────────────────────────────────────────────────────
+
+fn resolve_paint(
+    paint: &Paint,
+    warned_multi_stop: &mut bool,
+) -> ([f32; 4], [f32; 4], [f32; 2], [f32; 2]) {
+    match paint {
+        Paint::Solid(c) => {
+            let col = [c.r, c.g, c.b, c.a];
+            (col, col, [0.0, 0.0], [0.0, 0.0])
+        }
+        Paint::LinearGradient(g) => {
+            if g.stops.len() < 2 {
+                let col = g
+                    .stops
+                    .first()
+                    .map_or([0.0f32; 4], |s| [s.color.r, s.color.g, s.color.b, s.color.a]);
+                return (col, col, [0.0, 0.0], [0.0, 0.0]);
+            }
+            if g.stops.len() > 2 && !*warned_multi_stop {
+                log::debug!(
+                    "CircleRenderer: only 2-stop gradients supported; \
+                     using first and last stop"
+                );
+                *warned_multi_stop = true;
+            }
+            let c0 = g.stops.first().unwrap().color;
+            let c1 = g.stops.last().unwrap().color;
+            (
+                [c0.r, c0.g, c0.b, c0.a],
+                [c1.r, c1.g, c1.b, c1.a],
+                [g.start.x, g.start.y],
+                [g.end.x, g.end.y],
+            )
+        }
+    }
+}
+
+// ── blend state ───────────────────────────────────────────────────────────
 
 fn premul_alpha_blend() -> wgpu::BlendState {
     wgpu::BlendState {
@@ -331,21 +344,22 @@ fn premul_alpha_blend() -> wgpu::BlendState {
     }
 }
 
+// ── GPU types ─────────────────────────────────────────────────────────────
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 struct ViewportUniform {
     viewport: [f32; 2],
-    _pad: [f32; 2], // 16-byte alignment
+    _pad: [f32; 2],
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 struct QuadVertex {
-    pos: [f32; 2], // 0..1
+    pos: [f32; 2],
 }
 
 impl QuadVertex {
-    // Static attributes to satisfy `'static` layout references.
     const ATTRS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x2];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
@@ -357,24 +371,41 @@ impl QuadVertex {
     }
 }
 
+/// Instance data layout (80 bytes):
+///
+///  offset  0  center      [f32; 2]   loc 1
+///  offset  8  radius_bw   [f32; 2]   loc 2  (.x = radius, .y = border_width)
+///  offset 16  color0      [f32; 4]   loc 3
+///  offset 32  color1      [f32; 4]   loc 4
+///  offset 48  grad_p0     [f32; 2]   loc 5
+///  offset 56  grad_p1     [f32; 2]   loc 6
+///  offset 64  border_color[f32; 4]   loc 7
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
-struct RectInstance {
-    origin: [f32; 2],
-    size: [f32; 2],
-    color: [f32; 4],
+struct CircleInstance {
+    center: [f32; 2],
+    radius_bw: [f32; 2],
+    color0: [f32; 4],
+    color1: [f32; 4],
+    grad_p0: [f32; 2],
+    grad_p1: [f32; 2],
+    border_color: [f32; 4],
 }
 
-impl RectInstance {
-    const ATTRS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
-        1 => Float32x2, // origin
-        2 => Float32x2, // size
-        3 => Float32x4  // color
+impl CircleInstance {
+    const ATTRS: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
+        1 => Float32x2, // center
+        2 => Float32x2, // radius_bw
+        3 => Float32x4, // color0
+        4 => Float32x4, // color1
+        5 => Float32x2, // grad_p0
+        6 => Float32x2, // grad_p1
+        7 => Float32x4  // border_color
     ];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<RectInstance>() as u64,
+            array_stride: std::mem::size_of::<CircleInstance>() as u64,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &Self::ATTRS,
         }

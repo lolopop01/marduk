@@ -13,3 +13,4 @@ pub mod coords;
 pub mod render;
 pub mod paint;
 pub mod scene;
+pub mod text;

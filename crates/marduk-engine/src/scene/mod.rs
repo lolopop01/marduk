@@ -15,4 +15,5 @@ pub mod shapes;
 pub use cmd::DrawCmd;
 pub use key::SortKey;
 pub use list::{DrawItem, DrawList};
+pub use shapes::Border;
 pub use z_index::ZIndex;
