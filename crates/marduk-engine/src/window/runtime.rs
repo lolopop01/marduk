@@ -6,6 +6,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::platform::wayland::WindowAttributesExtWayland;
 use winit::window::{Window, WindowId};
 
 use crate::core::{App as CoreApp, AppControl, FrameCtx, WindowCtx};
@@ -127,8 +128,9 @@ where
     ) -> Result<WindowId> {
         let attrs = Window::default_attributes()
             .with_visible(true)
-            .with_title(config.title)
+            .with_title(config.title.clone())
             .with_inner_size(config.initial_size);
+
 
         let window = event_loop
             .create_window(attrs)
@@ -228,7 +230,6 @@ where
         // Later: invalidation-based redraw from UI.
         for entry in self.windows.values() {
             entry.with_window(|w| {
-                w.pre_present_notify();
                 w.request_redraw();
             });
         }
@@ -288,7 +289,6 @@ where
                 if let Some(entry) = self.windows.get_mut(&window_id) {
                     entry.with_gpu_mut(|gpu| gpu.resize(*new_size));
                     entry.with_window(|w| {
-                        w.pre_present_notify();
                         w.request_redraw();
                     });
                 }
@@ -299,7 +299,6 @@ where
                     let new_size = entry.with_window(|w| w.inner_size());
                     entry.with_gpu_mut(|gpu| gpu.resize(new_size));
                     entry.with_window(|w| {
-                        w.pre_present_notify();
                         w.request_redraw();
                     });
                 }

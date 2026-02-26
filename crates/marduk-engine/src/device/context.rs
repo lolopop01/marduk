@@ -167,7 +167,7 @@ impl<'w> Gpu<'w> {
     pub fn submit(&self, frame: GpuFrame) {
         self.queue.submit(std::iter::once(frame.encoder.finish()));
         drop(frame.view);
-        drop(frame.surface_texture);
+        frame.surface_texture.present();
     }
 
     /// Converts a `SurfaceError` into a higher-level action.
