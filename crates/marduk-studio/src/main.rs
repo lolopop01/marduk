@@ -1,12 +1,11 @@
 use anyhow::Result;
 
-use marduk_engine::coords::{CornerRadii, Rect, Vec2, Viewport};
+use marduk_engine::coords::{CornerRadii, Rect, Vec2};
 use marduk_engine::core::{App, AppControl, FrameCtx};
-use marduk_engine::device::{GpuInit, SurfaceErrorAction};
+use marduk_engine::device::GpuInit;
 use marduk_engine::logging::{init_logging, LoggingConfig};
 use marduk_engine::paint::{Color, Paint};
 use marduk_engine::paint::gradient::{ColorStop, LinearGradient, SpreadMode};
-use marduk_engine::render::{RenderCtx, RenderTarget};
 use marduk_engine::render::shapes::circle::CircleRenderer;
 use marduk_engine::render::shapes::rect::RectRenderer;
 use marduk_engine::render::shapes::rounded_rect::RoundedRectRenderer;
@@ -58,15 +57,12 @@ impl StudioApp {
     }
 }
 
-/// Draws a small dim caption inside a card.
+/// Draws a small dim caption at the bottom of a card.
 fn caption(draw_list: &mut DrawList, font: FontId, pos: Vec2, text: &str) {
     draw_list.push_text(
-        ZIndex::new(10),
-        text,
-        font, 11.5,
+        ZIndex::new(10), text, font, 11.5,
         Color::from_straight(1.0, 1.0, 1.0, 0.38),
-        pos,
-        None,
+        pos, None,
     );
 }
 
@@ -74,10 +70,7 @@ impl App for StudioApp {
     fn on_frame(&mut self, ctx: &mut FrameCtx<'_, '_>) -> AppControl {
         self.draw_list.clear();
 
-        let phys  = ctx.window.window.inner_size();
-        let scale = ctx.window.window.scale_factor();
-        let logical: winit::dpi::LogicalSize<f64> = phys.to_logical(scale);
-        let (w, h) = (logical.width as f32, logical.height as f32);
+        let (w, h) = ctx.window.logical_size();
 
         // ── full-screen background ─────────────────────────────────────────
         self.draw_list.push_solid_rect(
@@ -93,13 +86,11 @@ impl App for StudioApp {
                 "marduk  —  shape renderer test",
                 font, 18.0,
                 Color::from_straight(1.0, 1.0, 1.0, 0.75),
-                Vec2::new(20.0, 15.0),
-                None,
+                Vec2::new(20.0, 15.0), None,
             );
         }
 
         // ── grid layout ───────────────────────────────────────────────────
-        //  4 columns × 2 rows, each cell holds one test case.
         let pad    = 14.0_f32;
         let top    = 50.0_f32;
         let cols   = 4_usize;
@@ -107,13 +98,13 @@ impl App for StudioApp {
         let cell_w = (w - pad * (cols as f32 + 1.0)) / cols as f32;
         let cell_h = (h - top - pad * (rows as f32 + 1.0)) / rows as f32;
 
-        let label_h = 26.0_f32; // reserved at bottom of each card for caption
-        let inner   = 14.0_f32; // padding inside cards
+        let label_h = 26.0_f32;
+        let inner   = 14.0_f32;
 
         let cell_x = |col: usize| -> f32 { pad + col as f32 * (cell_w + pad) };
         let cell_y = |row: usize| -> f32 { top + pad + row as f32 * (cell_h + pad) };
 
-        // Card backgrounds (drawn all at once before shapes).
+        // Card backgrounds.
         for row in 0..rows {
             for col in 0..cols {
                 self.draw_list.push_rounded_rect(
@@ -126,13 +117,10 @@ impl App for StudioApp {
             }
         }
 
-        // Helpers that compute the drawable area and caption position for a cell.
         let shape_area = |col: usize, row: usize| -> Rect {
             Rect::new(
-                cell_x(col) + inner,
-                cell_y(row) + inner,
-                cell_w - inner * 2.0,
-                cell_h - label_h - inner * 2.0,
+                cell_x(col) + inner, cell_y(row) + inner,
+                cell_w - inner * 2.0, cell_h - label_h - inner * 2.0,
             )
         };
         let caption_pos = |col: usize, row: usize| -> Vec2 {
@@ -207,7 +195,7 @@ impl App for StudioApp {
                     Vec2::new(r.origin.x + r.size.x, r.origin.y + r.size.y),
                     vec![
                         ColorStop::new(0.0, Color::from_straight(0.95, 0.3, 0.5, 1.0)),
-                        ColorStop::new(1.0, Color::from_straight(0.3, 0.2, 1.0,  1.0)),
+                        ColorStop::new(1.0, Color::from_straight(0.3,  0.2, 1.0,  1.0)),
                     ],
                     SpreadMode::Pad,
                 )),
@@ -223,10 +211,8 @@ impl App for StudioApp {
             let a = shape_area(0, 1);
             let r = (a.size.x.min(a.size.y) * 0.5 - 18.0).max(8.0);
             let c = Vec2::new(a.origin.x + a.size.x * 0.5, a.origin.y + a.size.y * 0.5);
-            self.draw_list.push_solid_circle(
-                ZIndex::new(2), c, r,
-                Color::from_straight(1.0, 0.75, 0.1, 1.0),
-            );
+            self.draw_list.push_solid_circle(ZIndex::new(2), c, r,
+                Color::from_straight(1.0, 0.75, 0.1, 1.0));
             if let Some(f) = self.font {
                 caption(&mut self.draw_list, f, caption_pos(0, 1), "solid circle");
             }
@@ -261,7 +247,6 @@ impl App for StudioApp {
             let ins = 18.0_f32;
             let r = Rect::new(a.origin.x + ins, a.origin.y + ins,
                               a.size.x - ins * 2.0, a.size.y - ins * 2.0);
-            // top-left=0, top-right=36, bottom-right=0, bottom-left=36
             self.draw_list.push_rounded_rect(
                 ZIndex::new(2), r,
                 CornerRadii::new(0.0, 36.0, 0.0, 36.0),
@@ -294,52 +279,23 @@ impl App for StudioApp {
                 );
                 y += size + 5.0;
             }
-
             caption(&mut self.draw_list, font, caption_pos(3, 1), "text  —  multiple sizes");
         }
 
-        // ── acquire frame and render ───────────────────────────────────────
-        let mut frame = match ctx.gpu.begin_frame() {
-            Ok(f) => f,
-            Err(err) => {
-                let action = ctx.gpu.handle_surface_error(err);
-                if action == SurfaceErrorAction::Fatal { return AppControl::Exit; }
-                return AppControl::Continue;
-            }
-        };
+        // ── render ────────────────────────────────────────────────────────
+        let draw_list    = &mut self.draw_list;
+        let font_system  = &self.font_system;
+        let rect         = &mut self.rect_renderer;
+        let rounded_rect = &mut self.rounded_rect_renderer;
+        let circle       = &mut self.circle_renderer;
+        let text         = &mut self.text_renderer;
 
-        {
-            let _rpass = frame.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &frame.view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.07, g: 0.07, b: 0.11, a: 1.0 }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                    depth_slice: None,
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-        }
-
-        let viewport = Viewport::new(w, h);
-        let rctx     = RenderCtx::new(ctx.gpu.device(), ctx.gpu.queue(), ctx.gpu.surface_format(), viewport);
-        let mut target = RenderTarget::new(&mut frame.encoder, &frame.view);
-
-        self.rect_renderer.render(&rctx, &mut target, &mut self.draw_list);
-        self.rounded_rect_renderer.render(&rctx, &mut target, &mut self.draw_list);
-        self.circle_renderer.render(&rctx, &mut target, &mut self.draw_list);
-        self.text_renderer.render(&rctx, &mut target, &mut self.draw_list, &self.font_system);
-
-        ctx.window.window.pre_present_notify();
-        ctx.gpu.submit(frame);
-
-        AppControl::Continue
+        ctx.render(Color::from_straight(0.07, 0.07, 0.11, 1.0), |rctx, target| {
+            rect.render(rctx, target, draw_list);
+            rounded_rect.render(rctx, target, draw_list);
+            circle.render(rctx, target, draw_list);
+            text.render(rctx, target, draw_list, font_system);
+        })
     }
 }
 
