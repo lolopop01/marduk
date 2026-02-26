@@ -26,21 +26,34 @@ impl Default for StudioApp {
 
 impl App for StudioApp {
     fn on_frame(&mut self, ctx: &mut FrameCtx<'_, '_>) -> AppControl {
-        // Build a flashing square draw list.
         self.draw_list.clear();
 
-        let flash_on = (ctx.time.frame_index / 30) % 2 == 0; // ~0.5s at 60fps
-        let color = if flash_on {
-            // White, fully opaque (premultiplied)
-            Color::from_straight(1.0, 1.0, 1.0, 1.0)
-        } else {
-            // Transparent (no-op visually)
-            Color::transparent()
-        };
+        let t = ctx.time.frame_index as f32 * 0.012;
+        let phys = ctx.window.window.inner_size();
+        let scale = ctx.window.window.scale_factor();
+        let logical: winit::dpi::LogicalSize<f64> = phys.to_logical(scale);
 
-        // 100x100 square at (100,100)
-        let rect = Rect::from_origin_size(Vec2::new(100.0, 100.0), Vec2::new(100.0, 100.0));
-        self.draw_list.push_solid_rect(ZIndex::new(0), rect, color);
+        let cx = logical.width as f32 / 2.0;
+        let cy = logical.height as f32 / 2.0;
+        let orbit = 110.0_f32;
+        let size = Vec2::new(220.0, 220.0);
+        let half = size * 0.5;
+
+        // Three blobs orbiting the center, 120° apart, 60% opacity.
+        let blobs: [(f32, Color); 3] = [
+            (0.0,                               Color::from_straight(1.0, 0.15, 0.15, 0.6)),
+            (std::f32::consts::TAU / 3.0,       Color::from_straight(0.15, 1.0, 0.25, 0.6)),
+            (2.0 * std::f32::consts::TAU / 3.0, Color::from_straight(0.2, 0.5, 1.0, 0.6)),
+        ];
+
+        for (phase, color) in blobs {
+            let angle = t + phase;
+            let origin = Vec2::new(
+                cx + orbit * angle.cos() - half.x,
+                cy + orbit * angle.sin() - half.y,
+            );
+            self.draw_list.push_solid_rect(ZIndex::new(0), Rect::from_origin_size(origin, size), color);
+        }
 
         // Acquire frame.
         let mut frame = match ctx.gpu.begin_frame() {
@@ -54,7 +67,7 @@ impl App for StudioApp {
             }
         };
 
-        // Clear background (black).
+        // Clear to near-black.
         {
             let _rpass = frame.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("marduk-studio clear"),
@@ -62,7 +75,7 @@ impl App for StudioApp {
                     view: &frame.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.04, g: 0.04, b: 0.04, a: 1.0 }),
                         store: wgpu::StoreOp::Store,
                     },
                     depth_slice: None,
@@ -75,24 +88,11 @@ impl App for StudioApp {
         }
 
         // Compute viewport in logical pixels.
-        let phys = ctx.window.window.inner_size();
-        let scale = ctx.window.window.scale_factor();
-        let logical: winit::dpi::LogicalSize<f64> = phys.to_logical(scale);
         let viewport = Viewport::new(logical.width as f32, logical.height as f32);
-
-        let rctx = RenderCtx::new(
-            ctx.gpu.device(),
-            ctx.gpu.queue(),
-            ctx.gpu.surface_format(),
-            viewport,
-        );
-
+        let rctx = RenderCtx::new(ctx.gpu.device(), ctx.gpu.queue(), ctx.gpu.surface_format(), viewport);
         let mut target = RenderTarget::new(&mut frame.encoder, &frame.view);
-
-        // Draw rectangles (solid only in v0).
         self.rect_renderer.render(&rctx, &mut target, &mut self.draw_list);
 
-        // Present (Wayland requires pre-present notification to properly drive frame callbacks).
         ctx.window.window.pre_present_notify();
         ctx.gpu.submit(frame);
 
@@ -102,9 +102,5 @@ impl App for StudioApp {
 
 fn main() -> Result<()> {
     init_logging(LoggingConfig::default());
-
-    let initial = RuntimeConfig::default();
-    let gpu_init = GpuInit::default();
-
-    Runtime::run(initial, gpu_init, StudioApp::default())
+    Runtime::run(RuntimeConfig::default(), GpuInit::default(), StudioApp::default())
 }
