@@ -9,3 +9,4 @@ mod ctx;
 
 pub use app::{App, AppControl};
 pub use ctx::{FrameCtx, WindowCtx};
+pub use winit::window::CursorIcon;

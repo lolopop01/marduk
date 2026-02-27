@@ -2,6 +2,7 @@
 
 use bytemuck::{Pod, Zeroable};
 
+use crate::coords::{Rect, Viewport};
 use crate::paint::Paint;
 
 // ── blend ─────────────────────────────────────────────────────────────────
@@ -58,6 +59,36 @@ pub(super) const QUAD_VERTICES: [QuadVertex; 4] = [
 ];
 
 pub(super) const QUAD_INDICES: [u16; 6] = [0, 1, 2, 0, 2, 3];
+
+// ── scissor rect ──────────────────────────────────────────────────────────
+
+/// Converts a logical-pixel clip rect to physical scissor rect arguments for wgpu.
+///
+/// Returns `None` if the clip rect is zero-area (renderer should skip the draw call).
+/// Returns `Some((x, y, w, h))` in physical pixels, clamped to the viewport.
+///
+/// `clip = None` means "no scissor" → returns the full viewport rect.
+pub(super) fn logical_clip_to_scissor(
+    clip: Option<Rect>,
+    viewport: Viewport,
+    scale: f32,
+) -> Option<(u32, u32, u32, u32)> {
+    let phys_vw = (viewport.width * scale).max(1.0) as u32;
+    let phys_vh = (viewport.height * scale).max(1.0) as u32;
+
+    let (x, y, w, h) = match clip {
+        None => (0, 0, phys_vw, phys_vh),
+        Some(r) => {
+            let x  = ((r.origin.x * scale).max(0.0) as u32).min(phys_vw);
+            let y  = ((r.origin.y * scale).max(0.0) as u32).min(phys_vh);
+            let x2 = (((r.origin.x + r.size.x) * scale).max(0.0) as u32).min(phys_vw);
+            let y2 = (((r.origin.y + r.size.y) * scale).max(0.0) as u32).min(phys_vh);
+            (x, y, x2.saturating_sub(x), y2.saturating_sub(y))
+        }
+    };
+
+    if w == 0 || h == 0 { None } else { Some((x, y, w, h)) }
+}
 
 // ── paint resolution ──────────────────────────────────────────────────────
 

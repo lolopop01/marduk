@@ -1,4 +1,4 @@
-use winit::window::{Window, WindowId};
+use winit::window::{CursorIcon, Window, WindowId};
 
 use crate::coords::Viewport;
 use crate::device::{Gpu, SurfaceErrorAction};
@@ -23,6 +23,14 @@ impl<'a> WindowCtx<'a> {
         let scale = self.window.scale_factor();
         let logi: winit::dpi::LogicalSize<f64> = phys.to_logical(scale);
         (logi.width as f32, logi.height as f32)
+    }
+
+    /// Sets the mouse cursor shape for this window.
+    ///
+    /// Call each frame to keep the cursor updated (e.g. `Arrow` normally,
+    /// `Pointer` over a button, `Text` over a text field, etc.).
+    pub fn set_cursor(&self, cursor: CursorIcon) {
+        self.window.set_cursor(cursor);
     }
 }
 
@@ -55,6 +63,7 @@ impl<'a, 'w> FrameCtx<'a, 'w> {
         F: FnOnce(&RenderCtx<'_>, &mut RenderTarget<'_>),
     {
         let (w, h) = self.window.logical_size();
+        let scale_factor = self.window.window.scale_factor() as f32;
 
         let mut frame = match self.gpu.begin_frame() {
             Ok(f) => f,
@@ -97,6 +106,7 @@ impl<'a, 'w> FrameCtx<'a, 'w> {
             self.gpu.queue(),
             self.gpu.surface_format(),
             Viewport::new(w, h),
+            scale_factor,
         );
 
         // RenderTarget borrows frame.encoder; dropped before submit() takes frame.

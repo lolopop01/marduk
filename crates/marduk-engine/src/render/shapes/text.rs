@@ -8,7 +8,10 @@ use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
 use crate::text::FontSystem;
 
-use super::common::{premul_alpha_blend, QuadVertex, ViewportUniform, QUAD_INDICES, QUAD_VERTICES};
+use super::common::{
+    logical_clip_to_scissor, premul_alpha_blend, QuadVertex, ViewportUniform, QUAD_INDICES,
+    QUAD_VERTICES,
+};
 
 // ── atlas constants ────────────────────────────────────────────────────────
 
@@ -111,18 +114,22 @@ impl TextRenderer {
         self.ensure_sampler(ctx);
         self.ensure_static_buffers(ctx);
 
-        // ── collect text commands ──────────────────────────────────────────
+        // ── collect text commands (with clip rects) ────────────────────────
         let text_cmds: Vec<_> = draw_list
             .iter_in_paint_order()
             .filter_map(|item| {
-                if let DrawCmd::Text(cmd) = &item.cmd { Some(cmd.clone()) } else { None }
+                if let DrawCmd::Text(cmd) = &item.cmd {
+                    Some((cmd.clone(), item.clip_rect))
+                } else {
+                    None
+                }
             })
             .collect();
 
         // ── build glyph instance list ──────────────────────────────────────
-        let mut instances: Vec<GlyphInstance> = Vec::new();
+        let mut instances: Vec<(GlyphInstance, Option<crate::coords::Rect>)> = Vec::new();
 
-        for cmd in &text_cmds {
+        for (cmd, clip) in &text_cmds {
             let Some(font) = font_system.get(cmd.font) else {
                 log::warn!("TextRenderer: unknown FontId {:?}, skipping", cmd.font);
                 continue;
@@ -166,15 +173,18 @@ impl TextRenderer {
                     }
                 }
 
-                let Some(cached) = self.glyph_cache.get(&key) else { continue; };
+                let Some(cached) = self.glyph_cache.get(&key) else { continue };
 
-                instances.push(GlyphInstance {
-                    dst_min: [x, y],
-                    dst_max: [x + w as f32, y + h as f32],
-                    uv_min:  cached.uv_min,
-                    uv_max:  cached.uv_max,
-                    color,
-                });
+                instances.push((
+                    GlyphInstance {
+                        dst_min: [x, y],
+                        dst_max: [x + w as f32, y + h as f32],
+                        uv_min:  cached.uv_min,
+                        uv_max:  cached.uv_max,
+                        color,
+                    },
+                    *clip,
+                ));
             }
         }
 
@@ -188,7 +198,8 @@ impl TextRenderer {
         self.ensure_instance_capacity(ctx, instances.len());
 
         let Some(instance_vbo) = self.instance_vbo.as_ref() else { return; };
-        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&instances));
+        let raw: Vec<GlyphInstance> = instances.iter().map(|(inst, _)| *inst).collect();
+        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&raw));
 
         // ── immutable borrows ──────────────────────────────────────────────
         let Some(pipeline)   = self.pipeline.as_ref()   else { return; };
@@ -218,7 +229,22 @@ impl TextRenderer {
         rpass.set_vertex_buffer(0, quad_vbo.slice(..));
         rpass.set_vertex_buffer(1, instance_vbo.slice(..));
         rpass.set_index_buffer(quad_ibo.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(0..6, 0, 0..instances.len() as u32);
+
+        let mut i = 0u32;
+        while i < instances.len() as u32 {
+            let clip = instances[i as usize].1;
+            let mut j = i + 1;
+            while j < instances.len() as u32 && instances[j as usize].1 == clip {
+                j += 1;
+            }
+            if let Some((sx, sy, sw, sh)) =
+                logical_clip_to_scissor(clip, ctx.viewport, ctx.scale_factor)
+            {
+                rpass.set_scissor_rect(sx, sy, sw, sh);
+                rpass.draw_indexed(0..6, 0, i..j);
+            }
+            i = j;
+        }
     }
 
     // ── atlas helpers ──────────────────────────────────────────────────────

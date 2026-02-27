@@ -5,7 +5,8 @@ use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
 
 use super::common::{
-    premul_alpha_blend, resolve_paint, QuadVertex, ViewportUniform, QUAD_INDICES, QUAD_VERTICES,
+    logical_clip_to_scissor, premul_alpha_blend, resolve_paint, QuadVertex, ViewportUniform,
+    QUAD_INDICES, QUAD_VERTICES,
 };
 
 /// Renderer for `DrawCmd::RoundedRect`.
@@ -48,7 +49,7 @@ impl RoundedRectRenderer {
         self.ensure_static_buffers(ctx);
         self.ensure_bindings(ctx);
 
-        let mut instances: Vec<RoundedRectInstance> = Vec::new();
+        let mut instances: Vec<(RoundedRectInstance, Option<crate::coords::Rect>)> = Vec::new();
 
         for item in draw_list.iter_in_paint_order() {
             let DrawCmd::RoundedRect(cmd) = &item.cmd else { continue };
@@ -67,17 +68,20 @@ impl RoundedRectRenderer {
                 None => (0.0, [0.0f32; 4]),
             };
 
-            instances.push(RoundedRectInstance {
-                origin: [r.origin.x, r.origin.y],
-                size: [r.size.x, r.size.y],
-                radii: [rd.top_left, rd.top_right, rd.bottom_right, rd.bottom_left],
-                color0,
-                color1,
-                grad_p0,
-                grad_p1,
-                border_width_pad: [border_width, 0.0],
-                border_color,
-            });
+            instances.push((
+                RoundedRectInstance {
+                    origin: [r.origin.x, r.origin.y],
+                    size: [r.size.x, r.size.y],
+                    radii: [rd.top_left, rd.top_right, rd.bottom_right, rd.bottom_left],
+                    color0,
+                    color1,
+                    grad_p0,
+                    grad_p1,
+                    border_width_pad: [border_width, 0.0],
+                    border_color,
+                },
+                item.clip_rect,
+            ));
         }
 
         if instances.is_empty() {
@@ -88,7 +92,8 @@ impl RoundedRectRenderer {
         self.ensure_instance_capacity(ctx, instances.len());
 
         let Some(instance_vbo) = self.instance_vbo.as_ref() else { return };
-        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&instances));
+        let raw: Vec<RoundedRectInstance> = instances.iter().map(|(inst, _)| *inst).collect();
+        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&raw));
 
         let Some(pipeline) = self.pipeline.as_ref() else { return };
         let Some(bind_group) = self.bind_group.as_ref() else { return };
@@ -117,7 +122,22 @@ impl RoundedRectRenderer {
         rpass.set_vertex_buffer(0, quad_vbo.slice(..));
         rpass.set_vertex_buffer(1, instance_vbo.slice(..));
         rpass.set_index_buffer(quad_ibo.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(0..6, 0, 0..instances.len() as u32);
+
+        let mut i = 0u32;
+        while i < instances.len() as u32 {
+            let clip = instances[i as usize].1;
+            let mut j = i + 1;
+            while j < instances.len() as u32 && instances[j as usize].1 == clip {
+                j += 1;
+            }
+            if let Some((sx, sy, sw, sh)) =
+                logical_clip_to_scissor(clip, ctx.viewport, ctx.scale_factor)
+            {
+                rpass.set_scissor_rect(sx, sy, sw, sh);
+                rpass.draw_indexed(0..6, 0, i..j);
+            }
+            i = j;
+        }
     }
 
     // ── private helpers ────────────────────────────────────────────────────

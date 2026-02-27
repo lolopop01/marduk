@@ -5,7 +5,10 @@ use crate::paint::Paint;
 use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
 
-use super::common::{premul_alpha_blend, QuadVertex, ViewportUniform, QUAD_INDICES, QUAD_VERTICES};
+use super::common::{
+    logical_clip_to_scissor, premul_alpha_blend, QuadVertex, ViewportUniform, QUAD_INDICES,
+    QUAD_VERTICES,
+};
 
 /// Rectangle renderer (solid fill only for v0).
 ///
@@ -51,7 +54,8 @@ impl RectRenderer {
         self.ensure_bindings(ctx);
 
         // Build instance data from draw list in paint order.
-        let mut instances: Vec<RectInstance> = Vec::new();
+        // Each entry pairs the GPU instance with its clip rect.
+        let mut instances: Vec<(RectInstance, Option<crate::coords::Rect>)> = Vec::new();
 
         for item in draw_list.iter_in_paint_order() {
             let DrawCmd::Rect(cmd) = &item.cmd else { continue };
@@ -61,11 +65,14 @@ impl RectRenderer {
                     if r.is_empty() {
                         continue;
                     }
-                    instances.push(RectInstance {
-                        origin: [r.origin.x, r.origin.y],
-                        size: [r.size.x, r.size.y],
-                        color: [c.r, c.g, c.b, c.a],
-                    });
+                    instances.push((
+                        RectInstance {
+                            origin: [r.origin.x, r.origin.y],
+                            size: [r.size.x, r.size.y],
+                            color: [c.r, c.g, c.b, c.a],
+                        },
+                        item.clip_rect,
+                    ));
                 }
                 _ => {
                     if !self.warned_non_solid {
@@ -86,8 +93,9 @@ impl RectRenderer {
 
         let Some(instance_vbo) = self.instance_vbo.as_ref() else { return };
 
-        ctx.queue
-            .write_buffer(instance_vbo, 0, bytemuck::cast_slice(&instances));
+        // Upload raw instance data (strip clip rects).
+        let raw: Vec<RectInstance> = instances.iter().map(|(inst, _)| *inst).collect();
+        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&raw));
 
         // Now take immutable borrows.
         let Some(pipeline) = self.pipeline.as_ref() else { return };
@@ -117,7 +125,23 @@ impl RectRenderer {
         rpass.set_vertex_buffer(0, quad_vbo.slice(..));
         rpass.set_vertex_buffer(1, instance_vbo.slice(..));
         rpass.set_index_buffer(quad_ibo.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(0..6, 0, 0..instances.len() as u32);
+
+        // Draw one instanced call per consecutive clip-rect group.
+        let mut i = 0u32;
+        while i < instances.len() as u32 {
+            let clip = instances[i as usize].1;
+            let mut j = i + 1;
+            while j < instances.len() as u32 && instances[j as usize].1 == clip {
+                j += 1;
+            }
+            if let Some((sx, sy, sw, sh)) =
+                logical_clip_to_scissor(clip, ctx.viewport, ctx.scale_factor)
+            {
+                rpass.set_scissor_rect(sx, sy, sw, sh);
+                rpass.draw_indexed(0..6, 0, i..j);
+            }
+            i = j;
+        }
     }
 
     fn ensure_pipeline(&mut self, ctx: &RenderCtx<'_>) {

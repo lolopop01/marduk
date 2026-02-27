@@ -6,6 +6,10 @@ use marduk_engine::device::GpuInit;
 use marduk_engine::logging::{init_logging, LoggingConfig};
 use marduk_engine::paint::{Color, Paint};
 use marduk_engine::paint::gradient::{ColorStop, LinearGradient, SpreadMode};
+use marduk_engine::render::shapes::circle::CircleRenderer;
+use marduk_engine::render::shapes::rect::RectRenderer;
+use marduk_engine::render::shapes::rounded_rect::RoundedRectRenderer;
+use marduk_engine::render::shapes::text::TextRenderer;
 use marduk_engine::scene::{Border, DrawList, ZIndex};
 use marduk_engine::text::{FontId, FontSystem};
 use marduk_engine::window::{Runtime, RuntimeConfig};
@@ -24,6 +28,13 @@ struct StudioApp {
     draw_list:   DrawList,
     font_system: FontSystem,
     font:        Option<FontId>,
+
+    // Renderers — must persist across frames so GPU pipelines, buffers, and
+    // the glyph atlas are not destroyed and recreated every frame.
+    rect_renderer:          RectRenderer,
+    rounded_rect_renderer:  RoundedRectRenderer,
+    circle_renderer:        CircleRenderer,
+    text_renderer:          TextRenderer,
 
     // Simple UI state for "selection" and fake scrolling.
     selected: usize,
@@ -56,6 +67,10 @@ impl StudioApp {
             draw_list: DrawList::new(),
             font_system,
             font,
+            rect_renderer:         RectRenderer::new(),
+            rounded_rect_renderer: RoundedRectRenderer::new(),
+            circle_renderer:       CircleRenderer::new(),
+            text_renderer:         TextRenderer::new(),
             selected: 2,
             scroll_y: 0.0,
         }
@@ -723,31 +738,20 @@ impl App for StudioApp {
         }
 
         // ── render ────────────────────────────────────────────────────────
+        // Split borrows before the closure so the borrow checker can see that
+        // the renderer fields and the draw_list/font_system are distinct.
         let dl = &mut self.draw_list;
         let fs = &self.font_system;
-
-        // If your engine expects shape renderers explicitly like your previous sample,
-        // keep them in the struct. Here we rely on ctx.render() plus the target-specific
-        // renderer pipeline you already have in your engine.
-        //
-        // Since your earlier code called individual renderers, we’ll do the same:
-        // RectRenderer, RoundedRectRenderer, CircleRenderer, TextRenderer.
-        //
-        // If you *need* those fields, re-add them to StudioApp like your original snippet
-        // and wire them below (this version assumes your ctx.render can accept these draws).
-        //
-        // To stay compatible with your previous setup, we’ll instantiate renderers locally
-        // each frame (fine for a demo). Prefer storing them in self for real apps.
-        let mut rect_renderer         = marduk_engine::render::shapes::rect::RectRenderer::new();
-        let mut rounded_rect_renderer = marduk_engine::render::shapes::rounded_rect::RoundedRectRenderer::new();
-        let mut circle_renderer       = marduk_engine::render::shapes::circle::CircleRenderer::new();
-        let mut text_renderer         = marduk_engine::render::shapes::text::TextRenderer::new();
+        let r_rect  = &mut self.rect_renderer;
+        let r_rrect = &mut self.rounded_rect_renderer;
+        let r_circ  = &mut self.circle_renderer;
+        let r_text  = &mut self.text_renderer;
 
         ctx.render(win11::bg(), |rctx, target| {
-            rect_renderer.render(rctx, target, dl);
-            rounded_rect_renderer.render(rctx, target, dl);
-            circle_renderer.render(rctx, target, dl);
-            text_renderer.render(rctx, target, dl, fs);
+            r_rect.render(rctx, target, dl);
+            r_rrect.render(rctx, target, dl);
+            r_circ.render(rctx, target, dl);
+            r_text.render(rctx, target, dl, fs);
         })
     }
 }
