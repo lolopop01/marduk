@@ -121,9 +121,8 @@ impl InputState {
         }
 
         // Update frame with raw event + text streams.
-        match &ev {
-            InputEvent::Text(t) => frame.text.push(t.clone()),
-            _ => {}
+        if let InputEvent::Text(t) = &ev {
+            frame.text.push(t.clone());
         }
 
         frame.push_event(ev);

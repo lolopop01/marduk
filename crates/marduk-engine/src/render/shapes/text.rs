@@ -8,6 +8,8 @@ use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
 use crate::text::FontSystem;
 
+use super::common::{premul_alpha_blend, QuadVertex, ViewportUniform, QUAD_INDICES, QUAD_VERTICES};
+
 // ── atlas constants ────────────────────────────────────────────────────────
 
 const ATLAS_SIZE: u32 = 2048;
@@ -251,7 +253,7 @@ impl TextRenderer {
         let gx = self.atlas_cursor_x;
         let gy = self.atlas_cursor_y;
 
-        let Some(atlas) = self.atlas_texture.as_ref() else { return None; };
+        let atlas = self.atlas_texture.as_ref()?;
 
         ctx.queue.write_texture(
             // wgpu 28: ImageCopyTexture → TexelCopyTextureInfo
@@ -470,21 +472,14 @@ impl TextRenderer {
         if self.quad_vbo.is_some() && self.quad_ibo.is_some() {
             return;
         }
-        let quad    = [
-            QuadVertex { pos: [0.0, 0.0] },
-            QuadVertex { pos: [1.0, 0.0] },
-            QuadVertex { pos: [1.0, 1.0] },
-            QuadVertex { pos: [0.0, 1.0] },
-        ];
-        let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
         self.quad_vbo = Some(ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("marduk text quad vbo"),
-            contents: bytemuck::cast_slice(&quad),
+            contents: bytemuck::cast_slice(&QUAD_VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         }));
         self.quad_ibo = Some(ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("marduk text quad ibo"),
-            contents: bytemuck::cast_slice(&indices),
+            contents: bytemuck::cast_slice(&QUAD_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         }));
     }
@@ -516,49 +511,7 @@ impl TextRenderer {
     }
 }
 
-// ── blend state ───────────────────────────────────────────────────────────
-
-fn premul_alpha_blend() -> wgpu::BlendState {
-    wgpu::BlendState {
-        color: wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        },
-        alpha: wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        },
-    }
-}
-
 // ── GPU types ─────────────────────────────────────────────────────────────
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-struct ViewportUniform {
-    viewport: [f32; 2],
-    _pad: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-struct QuadVertex {
-    pos: [f32; 2],
-}
-
-impl QuadVertex {
-    const ATTRS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x2];
-
-    fn layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<QuadVertex>() as u64,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRS,
-        }
-    }
-}
 
 /// Instance data layout (48 bytes):
 ///

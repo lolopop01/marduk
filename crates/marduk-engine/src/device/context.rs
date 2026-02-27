@@ -14,13 +14,14 @@ use super::surface;
 /// - acquires frames and provides an encoder + view for rendering
 pub struct Gpu<'w> {
     /// wgpu instance used to create the adapter and surface.
+    ///
+    /// Kept alive for the duration of `Gpu` because some wgpu backends require
+    /// the instance to outlive all objects created from it.
+    #[allow(dead_code)]
     instance: wgpu::Instance,
 
     /// Surface bound to the window.
     surface: wgpu::Surface<'w>,
-
-    /// Selected adapter.
-    adapter: wgpu::Adapter,
 
     /// Logical device.
     device: wgpu::Device,
@@ -104,7 +105,6 @@ impl<'w> Gpu<'w> {
         Ok(Self {
             instance,
             surface,
-            adapter,
             device,
             queue,
             config,

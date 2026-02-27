@@ -7,6 +7,7 @@ use crate::paint::gradient::LinearGradient;
 /// - `RadialGradient`
 /// - `Image`
 /// - `Pattern`
+///
 /// while keeping the enum stable for renderer dispatch.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Paint {

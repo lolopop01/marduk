@@ -1,9 +1,12 @@
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
-use crate::paint::Paint;
 use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
+
+use super::common::{
+    premul_alpha_blend, resolve_paint, QuadVertex, ViewportUniform, QUAD_INDICES, QUAD_VERTICES,
+};
 
 /// Renderer for `DrawCmd::RoundedRect`.
 ///
@@ -12,6 +15,7 @@ use crate::scene::{DrawCmd, DrawList};
 /// - `Paint::LinearGradient` (2-stop; uses first and last stop for gradients with more stops)
 ///
 /// Borders are rendered as an AA ring on the outer edge of the shape.
+#[derive(Default)]
 pub struct RoundedRectRenderer {
     pipeline_format: Option<wgpu::TextureFormat>,
     pipeline: Option<wgpu::RenderPipeline>,
@@ -27,23 +31,6 @@ pub struct RoundedRectRenderer {
     instance_capacity: usize,
 
     warned_multi_stop: bool,
-}
-
-impl Default for RoundedRectRenderer {
-    fn default() -> Self {
-        Self {
-            pipeline_format: None,
-            pipeline: None,
-            bind_group_layout: None,
-            bind_group: None,
-            viewport_ubo: None,
-            quad_vbo: None,
-            quad_ibo: None,
-            instance_vbo: None,
-            instance_capacity: 0,
-            warned_multi_stop: false,
-        }
-    }
 }
 
 impl RoundedRectRenderer {
@@ -64,7 +51,7 @@ impl RoundedRectRenderer {
         let mut instances: Vec<RoundedRectInstance> = Vec::new();
 
         for item in draw_list.iter_in_paint_order() {
-            let DrawCmd::RoundedRect(cmd) = &item.cmd else { continue; };
+            let DrawCmd::RoundedRect(cmd) = &item.cmd else { continue };
 
             let r = cmd.rect.normalized();
             if r.is_empty() {
@@ -100,13 +87,13 @@ impl RoundedRectRenderer {
         self.write_viewport_uniform(ctx);
         self.ensure_instance_capacity(ctx, instances.len());
 
-        let Some(instance_vbo) = self.instance_vbo.as_ref() else { return; };
+        let Some(instance_vbo) = self.instance_vbo.as_ref() else { return };
         ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&instances));
 
-        let Some(pipeline)   = self.pipeline.as_ref()   else { return; };
-        let Some(bind_group) = self.bind_group.as_ref() else { return; };
-        let Some(quad_vbo)   = self.quad_vbo.as_ref()   else { return; };
-        let Some(quad_ibo)   = self.quad_ibo.as_ref()   else { return; };
+        let Some(pipeline) = self.pipeline.as_ref() else { return };
+        let Some(bind_group) = self.bind_group.as_ref() else { return };
+        let Some(quad_vbo) = self.quad_vbo.as_ref() else { return };
+        let Some(quad_ibo) = self.quad_ibo.as_ref() else { return };
 
         let mut rpass = target.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("marduk rounded_rect pass"),
@@ -219,7 +206,7 @@ impl RoundedRectRenderer {
         if self.bind_group.is_some() && self.viewport_ubo.is_some() {
             return;
         }
-        let Some(bgl) = self.bind_group_layout.as_ref() else { return; };
+        let Some(bgl) = self.bind_group_layout.as_ref() else { return };
 
         let viewport_ubo = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("marduk rounded_rect viewport ubo"),
@@ -246,34 +233,27 @@ impl RoundedRectRenderer {
             return;
         }
 
-        let quad = [
-            QuadVertex { pos: [0.0, 0.0] },
-            QuadVertex { pos: [1.0, 0.0] },
-            QuadVertex { pos: [1.0, 1.0] },
-            QuadVertex { pos: [0.0, 1.0] },
-        ];
-        let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
-
         self.quad_vbo = Some(ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("marduk rounded_rect quad vbo"),
-            contents: bytemuck::cast_slice(&quad),
+            contents: bytemuck::cast_slice(&QUAD_VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         }));
         self.quad_ibo = Some(ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("marduk rounded_rect quad ibo"),
-            contents: bytemuck::cast_slice(&indices),
+            contents: bytemuck::cast_slice(&QUAD_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         }));
     }
 
     fn write_viewport_uniform(&mut self, ctx: &RenderCtx<'_>) {
-        let Some(ubo) = self.viewport_ubo.as_ref() else { return; };
-        let w = ctx.viewport.width.max(1.0);
-        let h = ctx.viewport.height.max(1.0);
+        let Some(ubo) = self.viewport_ubo.as_ref() else { return };
         ctx.queue.write_buffer(
             ubo,
             0,
-            bytemuck::bytes_of(&ViewportUniform { viewport: [w, h], _pad: [0.0; 2] }),
+            bytemuck::bytes_of(&ViewportUniform {
+                viewport: [ctx.viewport.width.max(1.0), ctx.viewport.height.max(1.0)],
+                _pad: [0.0; 2],
+            }),
         );
     }
 
@@ -293,91 +273,7 @@ impl RoundedRectRenderer {
     }
 }
 
-// ── paint helpers ──────────────────────────────────────────────────────────
-
-/// Converts a `Paint` to the (color0, color1, grad_p0, grad_p1) tuple used by the shader.
-///
-/// For solid fills, both colors are identical and the gradient points are degenerate
-/// (zero-length), so the shader falls back to color0.
-fn resolve_paint(
-    paint: &Paint,
-    warned_multi_stop: &mut bool,
-) -> ([f32; 4], [f32; 4], [f32; 2], [f32; 2]) {
-    match paint {
-        Paint::Solid(c) => {
-            let col = [c.r, c.g, c.b, c.a];
-            (col, col, [0.0, 0.0], [0.0, 0.0])
-        }
-        Paint::LinearGradient(g) => {
-            if g.stops.len() < 2 {
-                let col = g
-                    .stops
-                    .first()
-                    .map_or([0.0f32; 4], |s| [s.color.r, s.color.g, s.color.b, s.color.a]);
-                return (col, col, [0.0, 0.0], [0.0, 0.0]);
-            }
-            if g.stops.len() > 2 && !*warned_multi_stop {
-                log::debug!(
-                    "RoundedRectRenderer: only 2-stop gradients supported; \
-                     using first and last stop"
-                );
-                *warned_multi_stop = true;
-            }
-            let c0 = g.stops.first().unwrap().color;
-            let c1 = g.stops.last().unwrap().color;
-            (
-                [c0.r, c0.g, c0.b, c0.a],
-                [c1.r, c1.g, c1.b, c1.a],
-                [g.start.x, g.start.y],
-                [g.end.x, g.end.y],
-            )
-        }
-    }
-}
-
-// ── blend state ───────────────────────────────────────────────────────────
-
-fn premul_alpha_blend() -> wgpu::BlendState {
-    wgpu::BlendState {
-        color: wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        },
-        alpha: wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        },
-    }
-}
-
 // ── GPU types ─────────────────────────────────────────────────────────────
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-struct ViewportUniform {
-    viewport: [f32; 2],
-    _pad: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-struct QuadVertex {
-    pos: [f32; 2],
-}
-
-impl QuadVertex {
-    const ATTRS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x2];
-
-    fn layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<QuadVertex>() as u64,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRS,
-        }
-    }
-}
 
 /// Instance data layout (104 bytes):
 ///
