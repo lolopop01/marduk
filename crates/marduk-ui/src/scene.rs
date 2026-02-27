@@ -82,9 +82,9 @@ impl UiScene {
     ) -> &mut DrawList {
         self.draw_list.clear();
         let ctx = LayoutCtx { fonts: &self.font_system };
-        let constraints = Constraints::loose(viewport);
-        let size = root.measure(constraints, &ctx);
-        let rect = Rect::new(0.0, 0.0, size.x.min(viewport.x), size.y.min(viewport.y));
+        // Measure so children know their sizes, but always fill the full viewport.
+        root.measure(Constraints::loose(viewport), &ctx);
+        let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
         {
             let mut painter = Painter::new(
                 &mut self.draw_list,
@@ -127,9 +127,9 @@ impl UiScene {
 
         // ── measure ───────────────────────────────────────────────────────
         let ctx = LayoutCtx { fonts: &self.font_system };
-        let constraints = Constraints::loose(viewport);
-        let size = root.measure(constraints, &ctx);
-        let rect = Rect::new(0.0, 0.0, size.x.min(viewport.x), size.y.min(viewport.y));
+        // Measure so children know their sizes, but always fill the full viewport.
+        root.measure(Constraints::loose(viewport), &ctx);
+        let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
 
         // ── paint ─────────────────────────────────────────────────────────
         {

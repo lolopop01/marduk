@@ -257,38 +257,54 @@ impl Widget for Row {
         let inner_h = self.inner_height(constraints.max.y);
         let child_c = self.child_constraints(inner_h);
 
-        let mut total_w = self.padding.h();
-        let mut max_child_h: f32 = 0.0;
+        let sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, ctx)).collect();
+        let spacer_count = sizes.iter().filter(|s| s.x == 0.0 && s.y == 0.0).count();
 
-        for (i, child) in self.children.iter().enumerate() {
-            let s = child.measure(child_c, ctx);
-            total_w += s.x;
-            if i + 1 < self.children.len() {
-                total_w += self.spacing;
-            }
-            max_child_h = max_child_h.max(s.y);
-        }
+        let fixed_w: f32     = sizes.iter().map(|s| s.x).sum();
+        let max_child_h: f32 = sizes.iter().map(|s| s.y).fold(0.0f32, f32::max);
+        let spacing_total    = (self.children.len().saturating_sub(1)) as f32 * self.spacing;
+
+        // When spacers are present and width is bounded, they fill remaining space.
+        let total_w = if spacer_count > 0 && constraints.max.x.is_finite() {
+            constraints.max.x
+        } else {
+            fixed_w + spacing_total + self.padding.h()
+        };
 
         let h = match self.cross_align {
             Align::Stretch => constraints.max.y.min(f32::MAX),
             _ => (max_child_h + self.padding.v()).max(0.0),
         };
 
-        // For Row, width is naturally sized (children side by side).
-        let w = total_w;
-        constraints.constrain(Vec2::new(w, h))
+        constraints.constrain(Vec2::new(total_w, h))
     }
 
     fn paint(&self, painter: &mut Painter, rect: Rect) {
         let fonts = painter.font_system;
         let ctx = LayoutCtx { fonts };
 
-        let inner = inset_rect(rect, self.padding);
+        let inner   = inset_rect(rect, self.padding);
         let child_c = self.child_constraints(inner.size.y);
 
+        // First pass: natural sizes.
+        let mut sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, &ctx)).collect();
+
+        // Distribute remaining width to zero-sized spacer children.
+        let spacer_count = sizes.iter().filter(|s| s.x == 0.0 && s.y == 0.0).count();
+        if spacer_count > 0 {
+            let fixed_w: f32  = sizes.iter().map(|s| s.x).sum();
+            let spacing_total = (self.children.len().saturating_sub(1)) as f32 * self.spacing;
+            let remaining     = (inner.size.x - fixed_w - spacing_total).max(0.0);
+            let spacer_w      = remaining / spacer_count as f32;
+            for s in sizes.iter_mut() {
+                if s.x == 0.0 && s.y == 0.0 {
+                    s.x = spacer_w;
+                }
+            }
+        }
+
         let mut x = inner.origin.x;
-        for (i, child) in self.children.iter().enumerate() {
-            let s = child.measure(child_c, &ctx);
+        for (i, (child, s)) in self.children.iter().zip(sizes.iter()).enumerate() {
             let y = self.child_y(inner.origin.y, inner.size.y, s.y);
             child.paint(painter, Rect::new(x, y, s.x, s.y));
             x += s.x;

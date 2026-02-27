@@ -12,15 +12,11 @@ pub enum Token {
     Number(f32),
     Color(Color),
     // Punctuation
-    Eq,
-    Comma,
-    Semicolon,
+    Colon,
     LBrace,
     RBrace,
-    LBracket,
-    RBracket,
     // Keywords
-    Use,
+    Import,
     As,
     // Sentinel
     Eof,
@@ -63,11 +59,10 @@ impl<'s> Lexer<'s> {
 
     fn skip_whitespace_and_comments(&mut self) {
         loop {
-            // skip whitespace
             while matches!(self.peek(), Some(c) if c.is_whitespace()) {
                 self.advance();
             }
-            // skip // line comments
+            // skip `//` line comments
             if self.src[self.pos..].starts_with("//") {
                 while !matches!(self.peek(), None | Some('\n')) {
                     self.advance();
@@ -87,26 +82,19 @@ impl<'s> Lexer<'s> {
         };
 
         match ch {
-            '=' => { self.advance(); Ok(Token::Eq) }
-            ',' => { self.advance(); Ok(Token::Comma) }
-            ';' => { self.advance(); Ok(Token::Semicolon) }
+            ':' => { self.advance(); Ok(Token::Colon) }
             '{' => { self.advance(); Ok(Token::LBrace) }
             '}' => { self.advance(); Ok(Token::RBrace) }
-            '[' => { self.advance(); Ok(Token::LBracket) }
-            ']' => { self.advance(); Ok(Token::RBracket) }
-
             '"' => self.lex_string(),
             '#' => self.lex_color(),
-
             c if c.is_ascii_digit() || c == '-' => self.lex_number(),
             c if c.is_alphabetic() || c == '_' => self.lex_ident_or_keyword(),
-
             other => Err(ParseError::new(format!("unexpected character {:?}", other))),
         }
     }
 
     fn lex_string(&mut self) -> Result<Token, ParseError> {
-        self.advance(); // consume opening "
+        self.advance(); // consume opening `"`
         let mut s = String::new();
         loop {
             match self.advance() {
@@ -114,11 +102,11 @@ impl<'s> Lexer<'s> {
                 Some('"') => break,
                 Some('\\') => {
                     match self.advance() {
-                        Some('n') => s.push('\n'),
-                        Some('t') => s.push('\t'),
-                        Some('"') => s.push('"'),
+                        Some('n')  => s.push('\n'),
+                        Some('t')  => s.push('\t'),
+                        Some('"')  => s.push('"'),
                         Some('\\') => s.push('\\'),
-                        Some(c) => s.push(c),
+                        Some(c)    => s.push(c),
                         None => return Err(ParseError::new("unterminated escape sequence")),
                     }
                 }
@@ -129,7 +117,7 @@ impl<'s> Lexer<'s> {
     }
 
     fn lex_color(&mut self) -> Result<Token, ParseError> {
-        self.advance(); // consume '#'
+        self.advance(); // consume `#`
         let start = self.pos;
         let mut count = 0;
         while matches!(self.peek(), Some(c) if c.is_ascii_hexdigit()) {
@@ -183,9 +171,9 @@ impl<'s> Lexer<'s> {
         }
         let word = &self.src[start..self.pos];
         Ok(match word {
-            "use" => Token::Use,
-            "as" => Token::As,
-            _ => Token::Ident(word.to_string()),
+            "import" => Token::Import,
+            "as"     => Token::As,
+            _        => Token::Ident(word.to_string()),
         })
     }
 }

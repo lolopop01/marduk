@@ -24,7 +24,7 @@ use crate::widgets::{
 pub struct DslBindings {
     /// Named fonts available to DSL nodes (e.g. `"body"` → `FontId`).
     pub fonts: HashMap<String, FontId>,
-    /// Shared event queue. Button `on_click=name` pushes `name` here.
+    /// Shared event queue. Button `on_click: name` pushes `name` here.
     pub event_queue: Rc<RefCell<Vec<String>>>,
 }
 
@@ -68,10 +68,7 @@ impl DslLoader {
     }
 
     /// Register a pre-parsed document under an alias so other documents can
-    /// reference it with `use "..." as Alias`.
-    ///
-    /// You should register all dependency documents **before** building,
-    /// using the alias that matches the `as Alias` in the importing file.
+    /// reference it with `import "..." as Alias`.
     pub fn register(&mut self, alias: impl Into<String>, doc: DslDocument) {
         self.registry.insert(alias.into(), doc);
     }
@@ -105,11 +102,9 @@ impl DslLoader {
             "Row"       => self.build_row(node, bindings),
             "Button"    => self.build_button(node, bindings),
             alias => {
-                // Look up a registered component document.
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
                 } else {
-                    // Graceful fallback: empty container so the tree still renders.
                     Container::new().into()
                 }
             }
@@ -122,9 +117,9 @@ impl DslLoader {
         let Some(font) = self.resolve_font(node, bindings) else {
             return Container::new().into();
         };
-        let text = node.content.clone().unwrap_or_default();
-        let size = node.attr_f32("size").unwrap_or(14.0);
-        let color = node.attr_color("color")
+        let text  = node.content.clone().unwrap_or_default();
+        let size  = node.prop_f32("size").unwrap_or(14.0);
+        let color = node.prop_color("color")
             .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 1.0));
         Text::new(text, font, size, color).into()
     }
@@ -133,16 +128,19 @@ impl DslLoader {
 
     fn build_container(&self, node: &Node, bindings: &DslBindings) -> Element {
         let mut c = Container::new();
-        if let Some(v) = node.attr_f32("padding") {
+        if let Some(v) = node.prop_f32("padding") {
             c = c.padding_all(v);
         }
-        if let Some(col) = node.attr_color("bg") {
+        if let Some(edges) = self.parse_edges(node) {
+            c = c.padding(edges);
+        }
+        if let Some(col) = node.prop_color("bg") {
             c = c.background(Paint::Solid(col));
         }
-        c = self.apply_border(c, node);
-        if let Some(r) = node.attr_f32("corner_radius") {
+        if let Some(r) = node.prop_f32("corner_radius") {
             c = c.corner_radius(r);
         }
+        c = self.apply_border(c, node);
         if let Some(child_node) = node.children.first() {
             c = c.child(self.build_node(child_node, bindings));
         }
@@ -153,10 +151,11 @@ impl DslLoader {
 
     fn build_column(&self, node: &Node, bindings: &DslBindings) -> Element {
         let mut col = Column::new();
-        if let Some(v) = node.attr_f32("spacing") {
+        // Accept `gap` (preferred) or `spacing` (compat)
+        if let Some(v) = node.prop_f32("gap").or_else(|| node.prop_f32("spacing")) {
             col = col.spacing(v);
         }
-        if let Some(v) = node.attr_f32("padding") {
+        if let Some(v) = node.prop_f32("padding") {
             col = col.padding_all(v);
         }
         if let Some(edges) = self.parse_edges(node) {
@@ -166,17 +165,19 @@ impl DslLoader {
         for child in &node.children {
             col = col.child(self.build_node(child, bindings));
         }
-        col.into()
+        let elem: Element = col.into();
+        self.maybe_wrap_bg(elem, node)
     }
 
     // ── Row ───────────────────────────────────────────────────────────────
 
     fn build_row(&self, node: &Node, bindings: &DslBindings) -> Element {
         let mut row = Row::new();
-        if let Some(v) = node.attr_f32("spacing") {
+        // Accept `gap` (preferred) or `spacing` (compat)
+        if let Some(v) = node.prop_f32("gap").or_else(|| node.prop_f32("spacing")) {
             row = row.spacing(v);
         }
-        if let Some(v) = node.attr_f32("padding") {
+        if let Some(v) = node.prop_f32("padding") {
             row = row.padding_all(v);
         }
         if let Some(edges) = self.parse_edges(node) {
@@ -186,14 +187,13 @@ impl DslLoader {
         for child in &node.children {
             row = row.child(self.build_node(child, bindings));
         }
-        row.into()
+        let elem: Element = row.into();
+        self.maybe_wrap_bg(elem, node)
     }
 
     // ── Button ────────────────────────────────────────────────────────────
 
     fn build_button(&self, node: &Node, bindings: &DslBindings) -> Element {
-        // Build inner child: if the node has explicit children, use those;
-        // otherwise treat inline content as a Text label.
         let inner: Element = if !node.children.is_empty() {
             if node.children.len() == 1 {
                 self.build_node(&node.children[0], bindings)
@@ -206,8 +206,8 @@ impl DslLoader {
             }
         } else if let Some(font) = self.resolve_font(node, bindings) {
             let label = node.content.clone().unwrap_or_default();
-            let size  = node.attr_f32("font_size").unwrap_or(14.0);
-            let color = node.attr_color("text_color")
+            let size  = node.prop_f32("font_size").unwrap_or(14.0);
+            let color = node.prop_color("text_color")
                 .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 1.0));
             Text::new(label, font, size, color).into()
         } else {
@@ -216,32 +216,32 @@ impl DslLoader {
 
         let mut btn = Button::new(inner);
 
-        if let Some(col) = node.attr_color("bg") {
+        if let Some(col) = node.prop_color("bg") {
             btn = btn.background(col);
         }
-        if let Some(col) = node.attr_color("hover_bg") {
+        if let Some(col) = node.prop_color("hover_bg") {
             btn = btn.hover_background(col);
         }
-        if let Some(col) = node.attr_color("press_bg") {
+        if let Some(col) = node.prop_color("press_bg") {
             btn = btn.press_background(col);
         }
-        if let Some(r) = node.attr_f32("corner_radius") {
+        if let Some(r) = node.prop_f32("corner_radius") {
             btn = btn.corner_radius(r);
         }
-        if let Some(v) = node.attr_f32("padding") {
+        if let Some(v) = node.prop_f32("padding") {
             btn = btn.padding_all(v);
         }
         if let Some(edges) = self.parse_edges(node) {
             btn = btn.padding(edges);
         }
-        if let Some(bw) = node.attr_f32("border_width") {
-            let bc = node.attr_color("border_color")
+        if let Some(bw) = node.prop_f32("border_width") {
+            let bc = node.prop_color("border_color")
                 .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 0.3));
             btn = btn.border(Border::new(bw, bc));
         }
-        if let Some(event_name) = node.attr_str("on_click") {
+        if let Some(event_name) = node.prop_str("on_click") {
             let queue = Rc::clone(&bindings.event_queue);
-            let name = event_name.to_string();
+            let name  = event_name.to_string();
             btn = btn.on_click(move || queue.borrow_mut().push(name.clone()));
         }
 
@@ -250,14 +250,31 @@ impl DslLoader {
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
+    /// If a node has a `bg` property, wrap `elem` in a Container with that background.
+    /// Used for Column/Row which don't have built-in background support.
+    fn maybe_wrap_bg(&self, elem: Element, node: &Node) -> Element {
+        if let Some(bg) = node.prop_color("bg") {
+            Container::new()
+                .background(Paint::Solid(bg))
+                .child(elem)
+                .into()
+        } else {
+            elem
+        }
+    }
+
     fn resolve_font(&self, node: &Node, bindings: &DslBindings) -> Option<FontId> {
-        node.attr_str("font")
+        node.prop_str("font")
             .and_then(|name| bindings.fonts.get(name).copied())
             .or_else(|| bindings.fonts.values().next().copied())
     }
 
+    /// Parse `align` (preferred) or `cross_align` (compat) property.
     fn parse_align(&self, node: &Node) -> Align {
-        match node.attr_str("cross_align").unwrap_or("stretch") {
+        let val = node.prop_str("align")
+            .or_else(|| node.prop_str("cross_align"))
+            .unwrap_or("stretch");
+        match val {
             "start"   => Align::Start,
             "center"  => Align::Center,
             "end"     => Align::End,
@@ -266,11 +283,10 @@ impl DslLoader {
     }
 
     fn parse_edges(&self, node: &Node) -> Option<Edges> {
-        // Only construct Edges if at least one directional key is present.
-        let top    = node.attr_f32("padding_top");
-        let right  = node.attr_f32("padding_right");
-        let bottom = node.attr_f32("padding_bottom");
-        let left   = node.attr_f32("padding_left");
+        let top    = node.prop_f32("padding_top");
+        let right  = node.prop_f32("padding_right");
+        let bottom = node.prop_f32("padding_bottom");
+        let left   = node.prop_f32("padding_left");
 
         if top.or(right).or(bottom).or(left).is_some() {
             Some(Edges {
@@ -285,8 +301,8 @@ impl DslLoader {
     }
 
     fn apply_border(&self, c: Container, node: &Node) -> Container {
-        if let Some(bw) = node.attr_f32("border_width") {
-            let bc = node.attr_color("border_color")
+        if let Some(bw) = node.prop_f32("border_width") {
+            let bc = node.prop_color("border_color")
                 .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 0.3));
             c.border(Border::new(bw, bc))
         } else {

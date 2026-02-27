@@ -1,36 +1,81 @@
-// Toolbar: navigation breadcrumb + action buttons.
-Row [spacing=8, padding=8, cross_align=center] {
-    // Navigation buttons.
-    Button "←" [font=body, font_size=14, text_color=#ffffffff,
-                on_click=nav_back,
-                bg=#ffffff0d, hover_bg=#ffffff1a, press_bg=#ffffff26,
-                corner_radius=4, padding=8]
+// Toolbar: navigation buttons, breadcrumb path, and action buttons.
+Row {
+    gap: 8
+    padding_left: 8
+    padding_right: 8
+    padding_top: 6
+    padding_bottom: 6
+    align: center
 
-    Button "→" [font=body, font_size=14, text_color=#ffffff66,
-                on_click=nav_forward,
-                bg=#ffffff0d, hover_bg=#ffffff1a, press_bg=#ffffff26,
-                corner_radius=4, padding=8]
-
-    // Breadcrumb label.
-    Container [padding=8, bg=#ffffff0d, corner_radius=4] {
-        Text "Home  /  Documents  /  Projects" [font=body, size=13, color=#ffffffcc]
+    Button "←" {
+        font: body
+        font_size: 14
+        text_color: #ffffffff
+        bg: #ffffff0d
+        hover_bg: #ffffff1a
+        press_bg: #ffffff26
+        corner_radius: 4
+        padding: 8
+        on_click: nav_back
     }
 
-    // Spacer.
-    Container []
+    Button "→" {
+        font: body
+        font_size: 14
+        text_color: #ffffff66
+        bg: #ffffff0d
+        hover_bg: #ffffff1a
+        press_bg: #ffffff26
+        corner_radius: 4
+        padding: 8
+        on_click: nav_forward
+    }
 
-    // New folder button.
-    Button "New folder" [font=body, font_size=13, text_color=#ffffffff,
-                         on_click=new_folder,
-                         bg=#4c6ef5ff, hover_bg=#748ffcff, press_bg=#5c7cfaff,
-                         corner_radius=4, padding_top=6, padding_bottom=6,
-                         padding_left=12, padding_right=12]
+    // Breadcrumb path display
+    Container {
+        padding: 8
+        bg: #ffffff0d
+        corner_radius: 4
 
-    // Upload button.
-    Button "Upload" [font=body, font_size=13, text_color=#ffffffff,
-                     on_click=upload_file,
-                     bg=#ffffff14, hover_bg=#ffffff1f, press_bg=#ffffff2a,
-                     border_width=1, border_color=#ffffff33,
-                     corner_radius=4, padding_top=6, padding_bottom=6,
-                     padding_left=12, padding_right=12]
+        Text "Home  /  Documents  /  Projects" {
+            font: body
+            size: 13
+            color: #ffffffcc
+        }
+    }
+
+    // Spacer
+    Container { }
+
+    Button "New folder" {
+        font: body
+        font_size: 13
+        text_color: #ffffffff
+        bg: #4c6ef5ff
+        hover_bg: #748ffcff
+        press_bg: #5c7cfaff
+        corner_radius: 4
+        padding_top: 6
+        padding_bottom: 6
+        padding_left: 12
+        padding_right: 12
+        on_click: new_folder
+    }
+
+    Button "Upload" {
+        font: body
+        font_size: 13
+        text_color: #ffffffff
+        bg: #ffffff14
+        hover_bg: #ffffff1f
+        press_bg: #ffffff2a
+        border_width: 1
+        border_color: #ffffff33
+        corner_radius: 4
+        padding_top: 6
+        padding_bottom: 6
+        padding_left: 12
+        padding_right: 12
+        on_click: upload_file
+    }
 }

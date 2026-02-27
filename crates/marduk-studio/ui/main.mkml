@@ -1,17 +1,31 @@
-// Root UI layout for Marduk Studio.
-// Imports reusable components from sibling files.
-use "titlebar.mkml" as Titlebar;
-use "toolbar.mkml" as Toolbar;
+// Root layout for Marduk Studio.
+import "titlebar.mkml" as Titlebar
+import "toolbar.mkml" as Toolbar
 
-Column [] {
-    // Window titlebar.
-    Container [bg=#1f1f1fff, padding=0] {
-        Titlebar
+Column {
+    bg: #1a1a1aff
+
+    // Titlebar strip
+    Titlebar { }
+
+    // Toolbar strip with a subtle bottom border
+    Container {
+        bg: #2b2b2bff
+        border_width: 1
+        border_color: #ffffff1a
+
+        Toolbar { }
     }
 
-    // Toolbar strip below the titlebar.
-    Container [bg=#2b2b2bff,
-               border_width=1, border_color=#ffffff1a] {
-        Toolbar
+    // Main content area
+    Container {
+        bg: #1e1e1eff
+        padding: 24
+
+        Text "Welcome to Marduk Studio" {
+            font: body
+            size: 20
+            color: #ffffffff
+        }
     }
 }

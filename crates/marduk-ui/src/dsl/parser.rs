@@ -1,4 +1,4 @@
-use crate::dsl::ast::{Attr, DslDocument, Import, Node, Value};
+use crate::dsl::ast::{DslDocument, Import, Node, Prop, Value};
 use crate::dsl::error::ParseError;
 use crate::dsl::lexer::{Lexer, Token};
 
@@ -18,8 +18,13 @@ impl Parser {
         self.tokens.get(self.pos).unwrap_or(&Token::Eof)
     }
 
-    fn advance(&mut self) -> &Token {
-        let tok = self.tokens.get(self.pos).unwrap_or(&Token::Eof);
+    /// Look at the token `offset` positions ahead of current without consuming.
+    fn peek_ahead(&self, offset: usize) -> &Token {
+        self.tokens.get(self.pos + offset).unwrap_or(&Token::Eof)
+    }
+
+    fn advance(&mut self) -> Token {
+        let tok = self.tokens.get(self.pos).cloned().unwrap_or(Token::Eof);
         if self.pos < self.tokens.len() {
             self.pos += 1;
         }
@@ -27,14 +32,21 @@ impl Parser {
     }
 
     fn expect_ident(&mut self) -> Result<String, ParseError> {
-        match self.advance().clone() {
+        match self.advance() {
             Token::Ident(s) => Ok(s),
             tok => Err(ParseError::new(format!("expected identifier, got {:?}", tok))),
         }
     }
 
-    fn expect(&mut self, expected: &Token) -> Result<(), ParseError> {
-        let got = self.advance().clone();
+    fn expect_str(&mut self) -> Result<String, ParseError> {
+        match self.advance() {
+            Token::Str(s) => Ok(s),
+            tok => Err(ParseError::new(format!("expected string, got {:?}", tok))),
+        }
+    }
+
+    fn expect_token(&mut self, expected: &Token) -> Result<(), ParseError> {
+        let got = self.advance();
         if &got == expected {
             Ok(())
         } else {
@@ -47,17 +59,12 @@ impl Parser {
     pub fn parse_document(&mut self) -> Result<DslDocument, ParseError> {
         let mut imports = Vec::new();
 
-        // Consume all leading `use` declarations.
-        while self.peek() == &Token::Use {
+        // Consume all leading `import` declarations.
+        while self.peek() == &Token::Import {
             imports.push(self.parse_import()?);
         }
 
         let root = self.parse_node()?;
-
-        // Optional trailing semicolon or Eof.
-        if self.peek() == &Token::Semicolon {
-            self.advance();
-        }
 
         Ok(DslDocument { imports, root })
     }
@@ -65,108 +72,90 @@ impl Parser {
     // ── Import ────────────────────────────────────────────────────────────
 
     fn parse_import(&mut self) -> Result<Import, ParseError> {
-        self.advance(); // consume `use`
-        let path = match self.advance().clone() {
-            Token::Str(s) => s,
-            tok => return Err(ParseError::new(format!("expected string path after `use`, got {:?}", tok))),
-        };
-        self.expect(&Token::As)?;
+        self.advance(); // consume `import`
+        let path = self.expect_str()?;
+        self.expect_token(&Token::As)?;
         let alias = self.expect_ident()?;
-        self.expect(&Token::Semicolon)?;
         Ok(Import { path, alias })
     }
 
     // ── Node ──────────────────────────────────────────────────────────────
 
     fn parse_node(&mut self) -> Result<Node, ParseError> {
-        // widget name
-        let widget = match self.peek().clone() {
-            Token::Ident(s) => { self.advance(); s }
-            tok => return Err(ParseError::new(format!("expected widget name, got {:?}", tok))),
-        };
+        let widget = self.expect_ident()?;
 
-        // optional inline string content
+        // Optional inline string content: `Text "Hello"` or `Button "OK"`
         let content = if let Token::Str(_) = self.peek() {
-            if let Token::Str(s) = self.advance().clone() { Some(s) } else { None }
+            if let Token::Str(s) = self.advance() { Some(s) } else { None }
         } else {
             None
         };
 
-        // optional attribute list [...]
-        let attrs = if self.peek() == &Token::LBracket {
-            self.parse_attrs()?
+        // Optional block `{ ... }` with properties and/or children mixed freely.
+        let (props, children) = if self.peek() == &Token::LBrace {
+            self.parse_block()?
         } else {
-            Vec::new()
+            (Vec::new(), Vec::new())
         };
 
-        // optional children block {...}
-        let children = if self.peek() == &Token::LBrace {
-            self.parse_children()?
-        } else {
-            Vec::new()
-        };
-
-        // optional trailing semicolon
-        if self.peek() == &Token::Semicolon {
-            self.advance();
-        }
-
-        Ok(Node { widget, content, attrs, children })
+        Ok(Node { widget, content, props, children })
     }
 
-    fn parse_attrs(&mut self) -> Result<Vec<Attr>, ParseError> {
-        self.advance(); // consume `[`
-        let mut attrs = Vec::new();
+    // ── Block ─────────────────────────────────────────────────────────────
+
+    /// Parse `{ item* }` where each item is either a `key: value` property
+    /// or a child widget node.
+    ///
+    /// Disambiguation: when we see `Ident`, we look one token ahead:
+    /// - `Ident ":"` → property
+    /// - `Ident <anything else>` → child widget node
+    fn parse_block(&mut self) -> Result<(Vec<Prop>, Vec<Node>), ParseError> {
+        self.advance(); // consume `{`
+        let mut props = Vec::new();
+        let mut children = Vec::new();
 
         loop {
-            if self.peek() == &Token::RBracket {
-                self.advance();
-                break;
-            }
-            attrs.push(self.parse_attr()?);
             match self.peek() {
-                Token::Comma => { self.advance(); }
-                Token::RBracket => {}
-                tok => return Err(ParseError::new(format!("expected `,` or `]` in attrs, got {:?}", tok))),
+                Token::RBrace => { self.advance(); break; }
+                Token::Eof    => return Err(ParseError::new("unclosed '{' block")),
+                Token::Ident(_) => {
+                    if self.peek_ahead(1) == &Token::Colon {
+                        props.push(self.parse_prop()?);
+                    } else {
+                        children.push(self.parse_node()?);
+                    }
+                }
+                tok => {
+                    return Err(ParseError::new(format!(
+                        "unexpected {:?} inside block — expected a property (key: value) or a widget name",
+                        tok
+                    )));
+                }
             }
         }
 
-        Ok(attrs)
+        Ok((props, children))
     }
 
-    fn parse_attr(&mut self) -> Result<Attr, ParseError> {
+    // ── Prop ──────────────────────────────────────────────────────────────
+
+    fn parse_prop(&mut self) -> Result<Prop, ParseError> {
         let key = self.expect_ident()?;
-        self.expect(&Token::Eq)?;
+        self.advance(); // consume `:`
         let value = self.parse_value()?;
-        Ok(Attr { key, value })
+        Ok(Prop { key, value })
     }
+
+    // ── Value ─────────────────────────────────────────────────────────────
 
     fn parse_value(&mut self) -> Result<Value, ParseError> {
-        match self.advance().clone() {
+        match self.advance() {
             Token::Str(s)    => Ok(Value::Str(s)),
             Token::Number(n) => Ok(Value::Number(n)),
             Token::Color(c)  => Ok(Value::Color(c)),
             Token::Ident(s)  => Ok(Value::Ident(s)),
-            tok => Err(ParseError::new(format!("expected value, got {:?}", tok))),
+            tok => Err(ParseError::new(format!("expected a value, got {:?}", tok))),
         }
-    }
-
-    fn parse_children(&mut self) -> Result<Vec<Node>, ParseError> {
-        self.advance(); // consume `{`
-        let mut children = Vec::new();
-
-        loop {
-            if self.peek() == &Token::RBrace {
-                self.advance();
-                break;
-            }
-            if self.peek() == &Token::Eof {
-                return Err(ParseError::new("unclosed `{` block"));
-            }
-            children.push(self.parse_node()?);
-        }
-
-        Ok(children)
     }
 }
 
