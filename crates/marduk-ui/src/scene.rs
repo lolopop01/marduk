@@ -1,4 +1,5 @@
 use marduk_engine::coords::{Rect, Vec2};
+use marduk_engine::input::Key;
 use marduk_engine::scene::DrawList;
 use marduk_engine::text::{FontId, FontSystem};
 
@@ -20,6 +21,10 @@ pub struct UiInput {
     pub mouse_pressed: bool,
     /// `true` for exactly one frame when the primary button is released.
     pub mouse_clicked: bool,
+    /// Committed text characters typed this frame (for `TextBox`).
+    pub text_input: Vec<String>,
+    /// Named keys pressed this frame (Backspace, Enter, …).
+    pub keys_pressed: Vec<Key>,
 }
 
 // ── UiScene ───────────────────────────────────────────────────────────────
@@ -94,9 +99,17 @@ impl UiScene {
             );
             root.paint(&mut painter, rect);
         }
-        if input.mouse_clicked {
+        {
             let ctx = LayoutCtx { fonts: &self.font_system };
-            root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+            if input.mouse_clicked {
+                root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+            }
+            for text in &input.text_input {
+                root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);
+            }
+            for key in &input.keys_pressed {
+                root.on_event(&UiEvent::KeyPress { key: *key }, rect, &ctx);
+            }
         }
         &mut self.draw_list
     }
@@ -144,9 +157,17 @@ impl UiScene {
         }
 
         // ── events ────────────────────────────────────────────────────────
-        if input.mouse_clicked {
+        {
             let ctx = LayoutCtx { fonts: &self.font_system };
-            root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+            if input.mouse_clicked {
+                root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+            }
+            for text in &input.text_input {
+                root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);
+            }
+            for key in &input.keys_pressed {
+                root.on_event(&UiEvent::KeyPress { key: *key }, rect, &ctx);
+            }
         }
 
         &mut self.draw_list

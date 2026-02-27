@@ -18,6 +18,7 @@ fn main() {
         .font("body", load_font())
         .component("Header",   include_str!("../ui/header.mkml"))
         .component("Controls", include_str!("../ui/controls.mkml"))
+        .component("Settings", include_str!("../ui/settings.mkml"))
         // ── SYSTEMS ───────────────────────────────────────────────────────
         .on_event("launch_sequence", || {
             println!();
@@ -185,6 +186,27 @@ fn main() {
             println!("  Deployment successful. Enjoy the new version!");
             println!();
         })
+        // ── SETTINGS ──────────────────────────────────────────────────────
+        .on_event("reactor_power_changed",  || println!("  [POWER] Reactor level adjusted."))
+        .on_event("shield_power_changed",   || println!("  [POWER] Shield generator output adjusted."))
+        .on_event("engine_power_changed",   || println!("  [POWER] Engine throttle adjusted."))
+        .on_event("life_support_toggled",   || println!("  [SYS] Life support toggled."))
+        .on_event("weapons_toggled",        || println!("  [SYS] Weapons status changed."))
+        .on_event("stealth_toggled",        || println!("  [SYS] Stealth mode toggled."))
+        .on_event("autopilot_toggled",      || println!("  [SYS] Autopilot toggled."))
+        .on_event("gravity_toggled",        || println!("  [SYS] Gravity plating toggled."))
+        .on_event("beacon_toggled",         || println!("  [SYS] Emergency beacon toggled."))
+        .on_event("comms_toggled",          || println!("  [SYS] Comms blackout toggled."))
+        .on_event("nav_mode_changed",       || println!("  [NAV] Navigation mode changed."))
+        .on_event("comms_draft_changed",    || {})   // silent, just persists state
+        .on_event("comms_transmit",         || {
+            println!();
+            println!("  [COMMS] Message queued for transmission.");
+            println!("  Encoding ... AES-256-GCM");
+            println!("  Status  ... QUEUED");
+            println!();
+        })
+        .on_event("comms_clear",            || println!("  [COMMS] Draft cleared."))
         .on_event("window_close", || std::process::exit(0))
         .run(include_str!("../ui/main.mkml"))
 }

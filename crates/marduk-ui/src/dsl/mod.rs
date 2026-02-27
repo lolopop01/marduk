@@ -54,6 +54,6 @@ pub mod lexer;
 pub mod parser;
 
 pub use ast::DslDocument;
-pub use builder::{DslBindings, DslLoader};
+pub use builder::{DslBindings, DslLoader, WidgetStateValue};
 pub use error::ParseError;
 pub use parser::parse_str;

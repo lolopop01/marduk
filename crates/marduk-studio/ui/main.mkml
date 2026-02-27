@@ -1,10 +1,12 @@
 // Marduk Mission Control — root layout
-import "header.mkml" as Header
+import "header.mkml"   as Header
 import "controls.mkml" as Controls
+import "settings.mkml" as Settings
 
 Column {
     bg: #040810ff
 
     Header { }
     Controls { }
+    Settings { }
 }

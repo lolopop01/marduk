@@ -61,9 +61,15 @@ pub mod prelude {
     pub use crate::widget::{Element, Widget};
     pub use crate::widgets::{
         button::Button,
+        checkbox::Checkbox,
         container::Container,
         flex::{Align, Column, Row},
+        progress::ProgressBar,
+        radio::{RadioGroup, RadioOption},
+        slider::Slider,
         text::Text,
+        textbox::TextBox,
+        toggle::Toggle,
     };
 
     // Re-export the engine primitives everyone needs.

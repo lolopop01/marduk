@@ -13,10 +13,29 @@ use crate::dsl::parser::parse_str;
 use crate::widget::Element;
 use crate::widgets::{
     button::Button,
+    checkbox::Checkbox,
     container::Container,
     flex::{Align, Column, Row},
+    progress::ProgressBar,
+    radio::RadioGroup,
+    slider::Slider,
     text::Text,
+    textbox::TextBox,
+    toggle::Toggle,
 };
+
+// ── WidgetStateValue ──────────────────────────────────────────────────────
+
+/// Persistent state for stateful DSL widgets (Checkbox, Toggle, Slider, RadioGroup).
+///
+/// Keyed by the widget's `state_key` prop (falls back to `on_change` event name).
+/// Lives in [`DslBindings::widget_state`] so it survives widget-tree rebuilds.
+#[derive(Debug, Clone)]
+pub enum WidgetStateValue {
+    Bool(bool),
+    Float(f32),
+    Str(String),
+}
 
 // ── DslBindings ───────────────────────────────────────────────────────────
 
@@ -26,11 +45,20 @@ pub struct DslBindings {
     pub fonts: HashMap<String, FontId>,
     /// Shared event queue. Button `on_click: name` pushes `name` here.
     pub event_queue: Rc<RefCell<Vec<String>>>,
+    /// Persistent state for stateful widgets (Checkbox, Toggle, Slider, RadioGroup, TextBox).
+    pub widget_state: Rc<RefCell<HashMap<String, WidgetStateValue>>>,
+    /// State key of the currently focused TextBox, if any.
+    pub focused_widget: Rc<RefCell<Option<String>>>,
 }
 
 impl DslBindings {
     pub fn new() -> Self {
-        Self { fonts: HashMap::new(), event_queue: Rc::new(RefCell::new(Vec::new())) }
+        Self {
+            fonts: HashMap::new(),
+            event_queue: Rc::new(RefCell::new(Vec::new())),
+            widget_state: Rc::new(RefCell::new(HashMap::new())),
+            focused_widget: Rc::new(RefCell::new(None)),
+        }
     }
 
     pub fn with_font(mut self, name: impl Into<String>, id: FontId) -> Self {
@@ -96,11 +124,17 @@ impl DslLoader {
 
     fn build_node(&self, node: &Node, bindings: &DslBindings) -> Element {
         match node.widget.as_str() {
-            "Text"      => self.build_text(node, bindings),
-            "Container" => self.build_container(node, bindings),
-            "Column"    => self.build_column(node, bindings),
-            "Row"       => self.build_row(node, bindings),
-            "Button"    => self.build_button(node, bindings),
+            "Text"        => self.build_text(node, bindings),
+            "Container"   => self.build_container(node, bindings),
+            "Column"      => self.build_column(node, bindings),
+            "Row"         => self.build_row(node, bindings),
+            "Button"      => self.build_button(node, bindings),
+            "Checkbox"    => self.build_checkbox(node, bindings),
+            "Toggle"      => self.build_toggle(node, bindings),
+            "Slider"      => self.build_slider(node, bindings),
+            "RadioGroup"  => self.build_radio_group(node, bindings),
+            "ProgressBar" => self.build_progress_bar(node, bindings),
+            "TextBox"     => self.build_textbox(node, bindings),
             alias => {
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
@@ -246,6 +280,285 @@ impl DslLoader {
         }
 
         btn.into()
+    }
+
+    // ── Checkbox ──────────────────────────────────────────────────────────
+
+    fn build_checkbox(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("state_key")
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let default_checked = node.prop_f32("checked").map(|v| v != 0.0).unwrap_or(false);
+        let checked = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Bool(b)) => *b,
+                _ => default_checked,
+            }
+        } else {
+            default_checked
+        };
+
+        let mut cb = Checkbox::new().checked(checked);
+
+        if let Some(font) = self.resolve_font(node, bindings) { cb = cb.font(font); }
+        if let Some(v) = node.prop_f32("font_size") { cb = cb.font_size(v); }
+        if let Some(v) = node.prop_color("label_color").or_else(|| node.prop_color("color")) {
+            cb = cb.label_color(v);
+        }
+        if let Some(v) = node.prop_f32("box_size") { cb = cb.box_size(v); }
+        if let Some(v) = node.prop_color("checked_color").or_else(|| node.prop_color("accent")) {
+            cb = cb.checked_color(v);
+        }
+        if let Some(v) = node.prop_color("border_color") { cb = cb.border_color(v); }
+        if let Some(v) = node.prop_f32("corner_radius") { cb = cb.corner_radius(v); }
+
+        let label = node.content.clone()
+            .or_else(|| node.prop_str("label").map(|s| s.to_string()))
+            .unwrap_or_default();
+        cb = cb.label(label);
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            cb = cb.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Bool(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        cb.into()
+    }
+
+    // ── Toggle ────────────────────────────────────────────────────────────
+
+    fn build_toggle(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("state_key")
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let default_checked = node.prop_f32("checked").map(|v| v != 0.0).unwrap_or(false);
+        let checked = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Bool(b)) => *b,
+                _ => default_checked,
+            }
+        } else {
+            default_checked
+        };
+
+        let mut tg = Toggle::new().checked(checked);
+
+        if let Some(v) = node.prop_f32("width")  { tg = tg.width(v); }
+        if let Some(v) = node.prop_f32("height") { tg = tg.height(v); }
+        if let Some(v) = node.prop_color("on_color")    { tg = tg.on_color(v); }
+        if let Some(v) = node.prop_color("off_color")   { tg = tg.off_color(v); }
+        if let Some(v) = node.prop_color("thumb_color") { tg = tg.thumb_color(v); }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            tg = tg.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Bool(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        tg.into()
+    }
+
+    // ── Slider ────────────────────────────────────────────────────────────
+
+    fn build_slider(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("state_key")
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let min = node.prop_f32("min").unwrap_or(0.0);
+        let max = node.prop_f32("max").unwrap_or(1.0);
+        let default_val = node.prop_f32("value").unwrap_or(min);
+
+        let value = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Float(v)) => *v,
+                _ => default_val,
+            }
+        } else {
+            default_val
+        };
+
+        let mut sl = Slider::new().min(min).max(max).value(value);
+
+        if let Some(v) = node.prop_f32("track_height")  { sl = sl.track_height(v); }
+        if let Some(v) = node.prop_f32("thumb_radius")  { sl = sl.thumb_radius(v); }
+        if let Some(v) = node.prop_color("track_color") { sl = sl.track_color(v); }
+        if let Some(v) = node.prop_color("fill_color").or_else(|| node.prop_color("accent")) {
+            sl = sl.fill_color(v);
+        }
+        if let Some(v) = node.prop_color("thumb_color") { sl = sl.thumb_color(v); }
+        if let Some(v) = node.prop_f32("corner_radius") { sl = sl.corner_radius(v); }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            sl = sl.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        sl.into()
+    }
+
+    // ── RadioGroup ────────────────────────────────────────────────────────
+
+    fn build_radio_group(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("state_key")
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let default_sel = node.prop_str("default")
+            .or_else(|| node.prop_str("selected"))
+            .map(|s| s.to_string());
+
+        let selected = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Str(s)) => Some(s.clone()),
+                _ => default_sel,
+            }
+        } else {
+            default_sel
+        };
+
+        let mut rg = RadioGroup::new();
+
+        if let Some(font) = self.resolve_font(node, bindings) { rg = rg.font(font); }
+        if let Some(v) = node.prop_f32("font_size")            { rg = rg.font_size(v); }
+        if let Some(v) = node.prop_color("label_color").or_else(|| node.prop_color("color")) {
+            rg = rg.label_color(v);
+        }
+        if let Some(v) = node.prop_color("accent")         { rg = rg.selected_color(v); }
+        if let Some(v) = node.prop_color("border_color")   { rg = rg.border_color(v); }
+        if let Some(v) = node.prop_f32("dot_radius")       { rg = rg.dot_radius(v); }
+        if let Some(v) = node.prop_f32("item_gap")         { rg = rg.item_gap(v); }
+        if let Some(sel) = selected                         { rg = rg.selected(sel); }
+
+        // Each RadioOption child node: RadioOption "Label" { value: some_value }
+        for child in &node.children {
+            if child.widget == "RadioOption" {
+                let label = child.content.clone().unwrap_or_default();
+                let value = child.prop_str("value").unwrap_or(&label).to_string();
+                rg = rg.option(label, value);
+            }
+        }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            rg = rg.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Str(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        rg.into()
+    }
+
+    // ── TextBox ───────────────────────────────────────────────────────────
+
+    fn build_textbox(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("state_key")
+            .or_else(|| node.prop_str("on_change"))
+            .or_else(|| node.prop_str("on_submit"))
+            .map(|s| s.to_string());
+
+        let default_text = node.prop_str("text")
+            .or_else(|| node.content.as_deref())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+
+        let text = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Str(s)) => s.clone(),
+                _ => default_text,
+            }
+        } else {
+            default_text
+        };
+
+        let focused = state_key.as_deref()
+            .map(|k| bindings.focused_widget.borrow().as_deref() == Some(k))
+            .unwrap_or(false);
+
+        let mut tb = TextBox::new().text(text).focused(focused);
+
+        if let Some(font) = self.resolve_font(node, bindings) { tb = tb.font(font); }
+        if let Some(v) = node.prop_f32("font_size")               { tb = tb.font_size(v); }
+        if let Some(v) = node.prop_color("text_color").or_else(|| node.prop_color("color")) {
+            tb = tb.text_color(v);
+        }
+        if let Some(v) = node.prop_color("placeholder_color")     { tb = tb.placeholder_color(v); }
+        if let Some(v) = node.prop_color("bg")                    { tb = tb.bg(v); }
+        if let Some(v) = node.prop_color("focused_bg")            { tb = tb.focused_bg(v); }
+        if let Some(v) = node.prop_color("border_color")          { tb = tb.border_color(v); }
+        if let Some(v) = node.prop_color("focused_border_color").or_else(|| node.prop_color("accent")) {
+            tb = tb.focused_border_color(v);
+        }
+        if let Some(v) = node.prop_f32("corner_radius")           { tb = tb.corner_radius(v); }
+        if let Some(v) = node.prop_f32("padding")                 { tb = tb.padding_all(v); }
+        if let Some(placeholder) = node.prop_str("placeholder")   {
+            tb = tb.placeholder(placeholder.to_string());
+        }
+
+        // on_focus: mark this widget as focused in bindings
+        if let Some(key) = state_key.clone() {
+            let focused_slot = Rc::clone(&bindings.focused_widget);
+            let k = key.clone();
+            tb = tb.on_focus(move || { *focused_slot.borrow_mut() = Some(k.clone()); });
+        }
+
+        // on_change: update text state + fire event
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.clone().unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            tb = tb.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Str(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        // on_submit: fire event
+        if let Some(event_name) = node.prop_str("on_submit") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let name  = event_name.to_string();
+            tb = tb.on_submit(move |_v| { queue.borrow_mut().push(name.clone()); });
+        }
+
+        tb.into()
+    }
+
+    // ── ProgressBar ───────────────────────────────────────────────────────
+
+    fn build_progress_bar(&self, node: &Node, _bindings: &DslBindings) -> Element {
+        let mut pb = ProgressBar::new();
+        if let Some(v) = node.prop_f32("value")          { pb = pb.value(v); }
+        if let Some(v) = node.prop_f32("height")         { pb = pb.height(v); }
+        if let Some(v) = node.prop_color("track_color")  { pb = pb.track_color(v); }
+        if let Some(v) = node.prop_color("fill_color").or_else(|| node.prop_color("accent")) {
+            pb = pb.fill_color(v);
+        }
+        if let Some(v) = node.prop_f32("corner_radius")  { pb = pb.corner_radius(v); }
+        pb.into()
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

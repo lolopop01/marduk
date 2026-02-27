@@ -1,0 +1,417 @@
+// Ship systems settings panel — showcases new UI components
+Column {
+    padding_left: 20
+    padding_right: 20
+    padding_top: 16
+    padding_bottom: 20
+    gap: 14
+
+    // ── POWER ────────────────────────────────────────────────────────────
+    Container {
+        bg: #060e18ff
+        border_width: 1
+        border_color: #0d2238ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 12
+
+            Text "// POWER MANAGEMENT" {
+                font: body
+                size: 11
+                color: #00e5a0ff
+            }
+
+            Row {
+                gap: 24
+                align: start
+
+                Column {
+                    gap: 8
+
+                    Text "Main reactor" {
+                        font: body
+                        size: 11
+                        color: #4a6a8aff
+                    }
+
+                    Slider {
+                        font: body
+                        state_key: reactor_power
+                        min: 0
+                        max: 100
+                        value: 78
+                        accent: #00e5a0ff
+                        track_color: #0a1828ff
+                        on_change: reactor_power_changed
+                    }
+                }
+
+                Column {
+                    gap: 8
+
+                    Text "Shield generator" {
+                        font: body
+                        size: 11
+                        color: #4a6a8aff
+                    }
+
+                    Slider {
+                        font: body
+                        state_key: shield_power
+                        min: 0
+                        max: 100
+                        value: 62
+                        accent: #00aaffff
+                        track_color: #0a1828ff
+                        on_change: shield_power_changed
+                    }
+                }
+
+                Column {
+                    gap: 8
+
+                    Text "Propulsion" {
+                        font: body
+                        size: 11
+                        color: #4a6a8aff
+                    }
+
+                    Slider {
+                        font: body
+                        state_key: engine_power
+                        min: 0
+                        max: 100
+                        value: 45
+                        accent: #ffaa00ff
+                        track_color: #0a1828ff
+                        on_change: engine_power_changed
+                    }
+                }
+            }
+        }
+    }
+
+    // ── TOGGLES ──────────────────────────────────────────────────────────
+    Container {
+        bg: #060e18ff
+        border_width: 1
+        border_color: #0d2238ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 12
+
+            Text "// SUBSYSTEMS" {
+                font: body
+                size: 11
+                color: #00aaffff
+            }
+
+            Row {
+                gap: 32
+                align: start
+
+                Column {
+                    gap: 10
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: life_support
+                            checked: true
+                            on_color: #00e5a0ff
+                            off_color: #1a2a3aff
+                            on_change: life_support_toggled
+                        }
+
+                        Text "Life support" {
+                            font: body
+                            size: 12
+                            color: #b8ccdfff
+                        }
+                    }
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: weapons_hot
+                            checked: false
+                            on_color: #ff5555ff
+                            off_color: #1a2a3aff
+                            on_change: weapons_toggled
+                        }
+
+                        Text "Weapons hot" {
+                            font: body
+                            size: 12
+                            color: #b8ccdfff
+                        }
+                    }
+                }
+
+                Column {
+                    gap: 10
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: stealth_mode
+                            checked: false
+                            on_color: #8844ffff
+                            off_color: #1a2a3aff
+                            on_change: stealth_toggled
+                        }
+
+                        Text "Stealth mode" {
+                            font: body
+                            size: 12
+                            color: #b8ccdfff
+                        }
+                    }
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: autopilot
+                            checked: true
+                            on_color: #00aaffff
+                            off_color: #1a2a3aff
+                            on_change: autopilot_toggled
+                        }
+
+                        Text "Autopilot" {
+                            font: body
+                            size: 12
+                            color: #b8ccdfff
+                        }
+                    }
+                }
+
+                Column {
+                    gap: 10
+
+                    Checkbox "Gravity plating" {
+                        font: body
+                        font_size: 12
+                        state_key: gravity_plating
+                        checked: true
+                        checked_color: #00e5a0ff
+                        border_color: #2a4860ff
+                        on_change: gravity_toggled
+                    }
+
+                    Checkbox "Emergency beacon" {
+                        font: body
+                        font_size: 12
+                        state_key: emergency_beacon
+                        checked: false
+                        checked_color: #ffaa00ff
+                        border_color: #2a4860ff
+                        on_change: beacon_toggled
+                    }
+
+                    Checkbox "Comms blackout" {
+                        font: body
+                        font_size: 12
+                        state_key: comms_blackout
+                        checked: false
+                        checked_color: #ff5555ff
+                        border_color: #2a4860ff
+                        on_change: comms_toggled
+                    }
+                }
+            }
+        }
+    }
+
+    // ── COMMS ────────────────────────────────────────────────────────────
+    Container {
+        bg: #060e18ff
+        border_width: 1
+        border_color: #0d2238ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 10
+
+            Text "// COMMS" {
+                font: body
+                size: 11
+                color: #00e5a0ff
+            }
+
+            TextBox {
+                font: body
+                font_size: 12
+                state_key: comms_message
+                placeholder: "Enter transmission message..."
+                accent: #00e5a0ff
+                border_color: #1a3a5aff
+                bg: #04100cff
+                focused_bg: #061812ff
+                corner_radius: 4
+                padding: 10
+                on_change: comms_draft_changed
+                on_submit: comms_transmit
+            }
+
+            Row {
+                gap: 10
+                align: start
+
+                Button "TRANSMIT" {
+                    font: body
+                    font_size: 12
+                    text_color: #00e5a0ff
+                    bg: #041810ff
+                    hover_bg: #062818ff
+                    press_bg: #083820ff
+                    border_width: 1
+                    border_color: #00e5a044
+                    corner_radius: 3
+                    padding_top: 8
+                    padding_bottom: 8
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: comms_transmit
+                }
+
+                Button "CLEAR" {
+                    font: body
+                    font_size: 12
+                    text_color: #4a6a8aff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #1a3a5aff
+                    corner_radius: 3
+                    padding_top: 8
+                    padding_bottom: 8
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: comms_clear
+                }
+            }
+        }
+    }
+
+    // ── NAV MODE + PROGRESS ──────────────────────────────────────────────
+    Container {
+        bg: #060e18ff
+        border_width: 1
+        border_color: #0d2238ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 12
+
+            Text "// NAVIGATION" {
+                font: body
+                size: 11
+                color: #ffaa00ff
+            }
+
+            Row {
+                gap: 32
+                align: start
+
+                Column {
+                    gap: 8
+
+                    Text "Nav mode" {
+                        font: body
+                        size: 11
+                        color: #4a6a8aff
+                    }
+
+                    RadioGroup {
+                        font: body
+                        font_size: 12
+                        state_key: nav_mode
+                        default: autopilot
+                        accent: #ffaa00ff
+                        border_color: #2a4860ff
+                        item_gap: 8
+                        on_change: nav_mode_changed
+
+                        RadioOption "Autopilot" { value: autopilot }
+                        RadioOption "Manual"    { value: manual }
+                        RadioOption "Drift"     { value: drift }
+                    }
+                }
+
+                Column {
+                    gap: 12
+
+                    Column {
+                        gap: 6
+
+                        Text "Jump drive charge" {
+                            font: body
+                            size: 11
+                            color: #4a6a8aff
+                        }
+
+                        ProgressBar {
+                            value: 0.83
+                            height: 6
+                            accent: #8844ffff
+                            track_color: #0a1828ff
+                            corner_radius: 3
+                        }
+                    }
+
+                    Column {
+                        gap: 6
+
+                        Text "Hull integrity" {
+                            font: body
+                            size: 11
+                            color: #4a6a8aff
+                        }
+
+                        ProgressBar {
+                            value: 0.71
+                            height: 6
+                            accent: #00e5a0ff
+                            track_color: #0a1828ff
+                            corner_radius: 3
+                        }
+                    }
+
+                    Column {
+                        gap: 6
+
+                        Text "Fuel reserves" {
+                            font: body
+                            size: 11
+                            color: #4a6a8aff
+                        }
+
+                        ProgressBar {
+                            value: 0.38
+                            height: 6
+                            accent: #ffaa00ff
+                            track_color: #0a1828ff
+                            corner_radius: 3
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

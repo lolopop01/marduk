@@ -288,6 +288,8 @@ impl EngineApp for UiAppState {
             mouse_pos:     Vec2::new(mx, my),
             mouse_pressed: ctx.input.button_down(MouseButton::Left),
             mouse_clicked: ctx.input_frame.buttons_released.contains(&MouseButton::Left),
+            text_input:    ctx.input_frame.text.iter().map(|t| t.text.clone()).collect(),
+            keys_pressed:  ctx.input_frame.keys_pressed.iter().copied().collect(),
         };
 
         // ── Layout + paint ────────────────────────────────────────────────
