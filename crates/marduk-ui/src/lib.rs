@@ -40,6 +40,7 @@
 //! }
 //! ```
 
+pub mod app;
 pub mod constraints;
 pub mod dsl;
 pub mod event;
@@ -63,11 +64,14 @@ pub mod prelude {
     };
 
     // Re-export the engine primitives everyone needs.
-    pub use marduk_engine::coords::{Rect, Vec2};
-    pub use marduk_engine::paint::{Color, Paint};
+    pub use marduk_engine::coords::{CornerRadii, Rect, Vec2};
+    pub use marduk_engine::paint::{Color, ColorStop, LinearGradient, Paint, SpreadMode};
     pub use marduk_engine::scene::Border;
     pub use marduk_engine::text::FontId;
 
     // DSL
     pub use crate::dsl::{DslBindings, DslDocument, DslLoader, ParseError};
+
+    // Application (entry point for end-user apps)
+    pub use crate::app::{Application, FontMap};
 }

@@ -69,6 +69,37 @@ impl UiScene {
         self.font_system.load_font(data)
     }
 
+    /// Like [`frame`] but borrows the root widget instead of consuming it.
+    ///
+    /// Use this when the root widget holds state that must persist across frames
+    /// (e.g. selection, scroll position). The widget is kept alive in the caller
+    /// and updated via `on_event` each frame.
+    pub fn frame_ref(
+        &mut self,
+        root: &mut Element,
+        viewport: Vec2,
+        input: &UiInput,
+    ) -> &mut DrawList {
+        self.draw_list.clear();
+        let ctx = LayoutCtx { fonts: &self.font_system };
+        let constraints = Constraints::loose(viewport);
+        let size = root.measure(constraints, &ctx);
+        let rect = Rect::new(0.0, 0.0, size.x.min(viewport.x), size.y.min(viewport.y));
+        {
+            let mut painter = Painter::new(
+                &mut self.draw_list,
+                &self.font_system,
+                input.mouse_pos,
+                input.mouse_pressed,
+            );
+            root.paint(&mut painter, rect);
+        }
+        if input.mouse_clicked {
+            root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect);
+        }
+        &mut self.draw_list
+    }
+
     /// Build, layout, and paint a widget tree for this frame.
     ///
     /// The root widget is consumed (it is freshly constructed each call).

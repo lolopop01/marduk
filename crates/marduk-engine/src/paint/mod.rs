@@ -10,8 +10,8 @@ pub mod color;
 pub mod gradient;
 
 pub use color::Color;
+pub use gradient::{ColorStop, LinearGradient, SpreadMode};
 
-use gradient::LinearGradient;
 
 /// Paint source for filling geometry.
 ///

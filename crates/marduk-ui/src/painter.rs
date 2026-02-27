@@ -77,6 +77,30 @@ impl<'a> Painter<'a> {
         self.draw_list.push_rounded_rect(z, rect, CornerRadii::all(radius), paint.into(), border);
     }
 
+    /// Circle with optional border.
+    pub fn fill_circle(
+        &mut self,
+        center: Vec2,
+        radius: f32,
+        paint: impl Into<Paint>,
+        border: Option<Border>,
+    ) {
+        let z = self.next_z();
+        self.draw_list.push_circle(z, center, radius, paint.into(), border);
+    }
+
+    /// Rounded rectangle with per-corner radii and optional border.
+    pub fn fill_rounded_rect_corners(
+        &mut self,
+        rect: Rect,
+        radii: CornerRadii,
+        paint: impl Into<Paint>,
+        border: Option<Border>,
+    ) {
+        let z = self.next_z();
+        self.draw_list.push_rounded_rect(z, rect, radii, paint.into(), border);
+    }
+
     /// Text at `origin` (top-left of the first line), clipped to `max_width`.
     pub fn text(
         &mut self,
