@@ -47,9 +47,11 @@ impl StudioApp {
 
         let font = [
             "/usr/share/fonts/TTF/SegoeUI.ttf",
-            "/usr/share/fonts/TTF/OpenSans-Regular.ttf",
+            // DejaVu before OpenSans/Noto: it covers misc symbols (U+25A1 □, U+2715 ✕)
+            // that OpenSans and NotoSans-Regular are missing.
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/TTF/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/OpenSans-Regular.ttf",
             "/usr/share/fonts/noto/NotoSans-Regular.ttf",
         ]
             .iter()
