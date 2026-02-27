@@ -1,14 +1,69 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Marduk UI — retained widget tree on top of `marduk-engine`.
+//!
+//! # Quick start
+//!
+//! ```rust,ignore
+//! use marduk_ui::prelude::*;
+//!
+//! let mut scene = UiScene::new();
+//! let font = scene.load_font(include_bytes!("my_font.ttf")).unwrap();
+//!
+//! // In your frame callback:
+//! let input = UiInput { mouse_pos, mouse_clicked, mouse_pressed };
+//! let draw_list = scene.frame(
+//!     Column::new()
+//!         .child(Text::new("Hello!", font, 18.0, Color::from_straight(1.0, 1.0, 1.0, 1.0)))
+//!         .child(Button::new(Text::new("Click me", font, 14.0, Color::from_straight(0.0, 0.0, 0.0, 1.0)))
+//!             .on_click(|| println!("clicked!"))),
+//!     viewport,
+//!     &input,
+//! );
+//! // Pass draw_list to your renderers.
+//! ```
+//!
+//! # Extending with custom widgets
+//!
+//! Implement [`Widget`] for any type, then use it anywhere an [`Element`] is accepted:
+//!
+//! ```rust,ignore
+//! use marduk_ui::prelude::*;
+//!
+//! pub struct MyWidget { /* your fields */ }
+//!
+//! impl Widget for MyWidget {
+//!     fn measure(&self, constraints: Constraints, ctx: &LayoutCtx) -> Vec2 {
+//!         Vec2::new(100.0, 40.0)
+//!     }
+//!     fn paint(&self, painter: &mut Painter, rect: Rect) {
+//!         painter.fill_rounded_rect(rect, 4.0, Paint::Solid(Color::from_straight(0.2, 0.5, 1.0, 1.0)), None);
+//!     }
+//! }
+//! ```
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod constraints;
+pub mod event;
+pub mod painter;
+pub mod scene;
+pub mod widget;
+pub mod widgets;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+/// Everything you need to build and extend UI — import this in your component files.
+pub mod prelude {
+    pub use crate::constraints::{Constraints, Edges, LayoutCtx};
+    pub use crate::event::{EventResult, UiEvent};
+    pub use crate::painter::Painter;
+    pub use crate::scene::{UiInput, UiScene};
+    pub use crate::widget::{Element, Widget};
+    pub use crate::widgets::{
+        button::Button,
+        container::Container,
+        flex::{Align, Column, Row},
+        text::Text,
+    };
+
+    // Re-export the engine primitives everyone needs.
+    pub use marduk_engine::coords::{Rect, Vec2};
+    pub use marduk_engine::paint::{Color, Paint};
+    pub use marduk_engine::scene::Border;
+    pub use marduk_engine::text::FontId;
 }
