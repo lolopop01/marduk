@@ -1,0 +1,304 @@
+// Mission control panels — 4 sections, each a full-width row of commands.
+Column {
+    padding_left: 20
+    padding_right: 20
+    padding_top: 20
+    padding_bottom: 20
+    gap: 14
+
+    // ── SYSTEMS ────────────────────────────────────────────────────────────
+    Container {
+        bg: #060e18ff
+        border_width: 1
+        border_color: #0d2238ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 10
+
+            Text "// SYSTEMS" {
+                font: body
+                size: 11
+                color: #00e5a0ff
+            }
+
+            Row {
+                gap: 10
+
+                Button "LAUNCH SEQUENCE" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #00e5a044
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: launch_sequence
+                }
+
+                Button "RUN DIAGNOSTICS" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #00e5a044
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: run_diagnostics
+                }
+
+                Button "SCAN SECTOR" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #00e5a044
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: scan_sector
+                }
+            }
+        }
+    }
+
+    // ── DATA OPS ───────────────────────────────────────────────────────────
+    Container {
+        bg: #060e18ff
+        border_width: 1
+        border_color: #0d2238ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 10
+
+            Text "// DATA OPS" {
+                font: body
+                size: 11
+                color: #00aaffff
+            }
+
+            Row {
+                gap: 10
+
+                Button "TRANSMIT DATA" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #00aaff44
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: transmit_data
+                }
+
+                Button "ANALYZE ANOMALY" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #00aaff44
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: analyze_anomaly
+                }
+
+                Button "CALIBRATE" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #00aaff44
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: calibrate_sensors
+                }
+            }
+        }
+    }
+
+    // ── OPERATIONS ─────────────────────────────────────────────────────────
+    Container {
+        bg: #060e18ff
+        border_width: 1
+        border_color: #0d2238ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 10
+
+            Text "// OPERATIONS" {
+                font: body
+                size: 11
+                color: #ffaa00ff
+            }
+
+            Row {
+                gap: 10
+
+                Button "ENGAGE WARP" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #ffaa0044
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: engage_warp
+                }
+
+                Button "SHIELDS ONLINE" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #ffaa0044
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: activate_shields
+                }
+
+                Button "OPEN CHANNEL" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #ffaa0044
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: hail_frequency
+                }
+            }
+        }
+    }
+
+    // ── OVERRIDE ───────────────────────────────────────────────────────────
+    Container {
+        bg: #0e0808ff
+        border_width: 1
+        border_color: #2a1010ff
+        corner_radius: 4
+        padding: 16
+
+        Column {
+            gap: 10
+
+            Text "// OVERRIDE" {
+                font: body
+                size: 11
+                color: #ff5555ff
+            }
+
+            Row {
+                gap: 10
+
+                Button "EMERGENCY STOP" {
+                    font: body
+                    font_size: 12
+                    text_color: #ff8888ff
+                    bg: #180808ff
+                    hover_bg: #280c0cff
+                    press_bg: #381010ff
+                    border_width: 1
+                    border_color: #ff444466
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: emergency_stop
+                }
+
+                Button "RESET SYSTEMS" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #ff444433
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: reset_systems
+                }
+
+                Button "DEPLOY" {
+                    font: body
+                    font_size: 12
+                    text_color: #b8ccdfff
+                    bg: #0a1828ff
+                    hover_bg: #102038ff
+                    press_bg: #142848ff
+                    border_width: 1
+                    border_color: #ff444433
+                    corner_radius: 3
+                    padding_top: 9
+                    padding_bottom: 9
+                    padding_left: 14
+                    padding_right: 14
+                    on_click: deploy_payload
+                }
+            }
+        }
+    }
+}

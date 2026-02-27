@@ -229,10 +229,16 @@ impl Row {
 
     fn child_constraints(&self, inner_h: f32) -> Constraints {
         match self.cross_align {
-            Align::Stretch => Constraints {
-                min: Vec2::new(0.0, inner_h),
-                max: Vec2::new(f32::INFINITY, inner_h),
-            },
+            Align::Stretch => {
+                // Only enforce the height when it is finite (the Row has a known
+                // height to fill).  When inner_h is INFINITY the row is inside an
+                // unconstrained column — children should size naturally, not to ∞.
+                let min_h = if inner_h.is_finite() { inner_h } else { 0.0 };
+                Constraints {
+                    min: Vec2::new(0.0, min_h),
+                    max: Vec2::new(f32::INFINITY, inner_h),
+                }
+            }
             _ => Constraints::loose(Vec2::new(f32::INFINITY, inner_h)),
         }
     }
@@ -272,7 +278,13 @@ impl Widget for Row {
         };
 
         let h = match self.cross_align {
-            Align::Stretch => constraints.max.y.min(f32::MAX),
+            // Only fill the available height when it is actually constrained.
+            // When max.y is INFINITY (e.g. Row inside an unconstrained Column)
+            // fall back to content height so we don't report a giant size.
+            Align::Stretch => {
+                if constraints.max.y.is_finite() { constraints.max.y }
+                else { (max_child_h + self.padding.v()).max(0.0) }
+            }
             _ => (max_child_h + self.padding.v()).max(0.0),
         };
 

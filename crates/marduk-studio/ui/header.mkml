@@ -1,0 +1,25 @@
+// Mission Control header bar
+Row {
+    align: center
+    padding_left: 24
+    padding_right: 24
+    padding_top: 14
+    padding_bottom: 14
+    bg: #0a1828ff
+    border_width: 1
+    border_color: #0d2c48ff
+
+    Text "MARDUK MISSION CONTROL" {
+        font: body
+        size: 15
+        color: #00e5a0ff
+    }
+
+    Container { }
+
+    Text "SYS: ONLINE  |  v0.1.0" {
+        font: body
+        size: 11
+        color: #2a4860ff
+    }
+}

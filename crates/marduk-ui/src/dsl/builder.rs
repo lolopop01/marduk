@@ -250,14 +250,24 @@ impl DslLoader {
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    /// If a node has a `bg` property, wrap `elem` in a Container with that background.
-    /// Used for Column/Row which don't have built-in background support.
+    /// Wrap `elem` in a Container when the node carries visual decoration
+    /// properties (bg, border, corner_radius) that Column/Row don't support
+    /// natively.
     fn maybe_wrap_bg(&self, elem: Element, node: &Node) -> Element {
-        if let Some(bg) = node.prop_color("bg") {
-            Container::new()
-                .background(Paint::Solid(bg))
-                .child(elem)
-                .into()
+        let bg     = node.prop_color("bg");
+        let radius = node.prop_f32("corner_radius");
+        let has_border = node.prop_f32("border_width").is_some();
+
+        if bg.is_some() || has_border || radius.is_some() {
+            let mut c = Container::new().child(elem);
+            if let Some(color) = bg {
+                c = c.background(Paint::Solid(color));
+            }
+            c = self.apply_border(c, node);
+            if let Some(r) = radius {
+                c = c.corner_radius(r);
+            }
+            c.into()
         } else {
             elem
         }

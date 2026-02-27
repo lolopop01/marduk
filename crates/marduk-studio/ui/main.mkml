@@ -1,31 +1,10 @@
-// Root layout for Marduk Studio.
-import "titlebar.mkml" as Titlebar
-import "toolbar.mkml" as Toolbar
+// Marduk Mission Control — root layout
+import "header.mkml" as Header
+import "controls.mkml" as Controls
 
 Column {
-    bg: #1a1a1aff
+    bg: #040810ff
 
-    // Titlebar strip
-    Titlebar { }
-
-    // Toolbar strip with a subtle bottom border
-    Container {
-        bg: #2b2b2bff
-        border_width: 1
-        border_color: #ffffff1a
-
-        Toolbar { }
-    }
-
-    // Main content area
-    Container {
-        bg: #1e1e1eff
-        padding: 24
-
-        Text "Welcome to Marduk Studio" {
-            font: body
-            size: 20
-            color: #ffffffff
-        }
-    }
+    Header { }
+    Controls { }
 }
