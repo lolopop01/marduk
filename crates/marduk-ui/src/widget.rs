@@ -4,6 +4,8 @@ use crate::constraints::{Constraints, LayoutCtx};
 use crate::event::{EventResult, UiEvent};
 use crate::painter::Painter;
 
+// (LayoutCtx is re-exported here for on_event impls in other modules)
+
 // ── Widget trait ──────────────────────────────────────────────────────────
 
 /// The core trait every UI component implements.
@@ -42,9 +44,12 @@ pub trait Widget: 'static {
 
     /// Route an input event. Return [`EventResult::Consumed`] to stop propagation.
     ///
+    /// `ctx` provides the font system so container widgets can re-run layout
+    /// and pass each child its actual screen rect (enabling correct hit-testing).
+    ///
     /// The default implementation does nothing and returns `Ignored`, so leaf
     /// widgets only need to override this if they handle events.
-    fn on_event(&mut self, _event: &UiEvent, _rect: Rect) -> EventResult {
+    fn on_event(&mut self, _event: &UiEvent, _rect: Rect, _ctx: &LayoutCtx<'_>) -> EventResult {
         EventResult::Ignored
     }
 }
@@ -78,8 +83,8 @@ impl Element {
     }
 
     #[inline]
-    pub fn on_event(&mut self, event: &UiEvent, rect: Rect) -> EventResult {
-        self.0.on_event(event, rect)
+    pub fn on_event(&mut self, event: &UiEvent, rect: Rect, ctx: &LayoutCtx<'_>) -> EventResult {
+        self.0.on_event(event, rect, ctx)
     }
 }
 

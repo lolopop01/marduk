@@ -153,15 +153,28 @@ impl Widget for Column {
         }
     }
 
-    fn on_event(&mut self, event: &UiEvent, rect: Rect) -> EventResult {
-        // Event routing without layout context: pass the full inner rect to
-        // each child. Children that care about their exact rect (e.g. Button)
-        // will still hit-test correctly when the tree is shallow and
-        // non-overlapping. A future revision can thread LayoutCtx through here.
-        let inner = inset_rect(rect, self.padding);
-        for child in self.children.iter_mut() {
-            if child.on_event(event, inner).is_consumed() {
+    fn on_event(&mut self, event: &UiEvent, rect: Rect, ctx: &LayoutCtx<'_>) -> EventResult {
+        let inner       = inset_rect(rect, self.padding);
+        let child_c     = self.child_constraints(inner.size.x);
+        let cross_align = self.cross_align;
+        let spacing     = self.spacing;
+        let n           = self.children.len();
+
+        let mut y = inner.origin.y;
+        for (i, child) in self.children.iter_mut().enumerate() {
+            let s = child.measure(child_c, ctx);
+            let x = match cross_align {
+                Align::Stretch | Align::Start => inner.origin.x,
+                Align::Center => inner.origin.x + (inner.size.x - s.x) * 0.5,
+                Align::End    => inner.origin.x + (inner.size.x - s.x),
+            };
+            let child_rect = Rect::new(x, y, s.x, s.y);
+            if child.on_event(event, child_rect, ctx).is_consumed() {
                 return EventResult::Consumed;
+            }
+            y += s.y;
+            if i + 1 < n {
+                y += spacing;
             }
         }
         EventResult::Ignored
@@ -326,11 +339,45 @@ impl Widget for Row {
         }
     }
 
-    fn on_event(&mut self, event: &UiEvent, rect: Rect) -> EventResult {
-        let inner = inset_rect(rect, self.padding);
-        for child in self.children.iter_mut() {
-            if child.on_event(event, inner).is_consumed() {
+    fn on_event(&mut self, event: &UiEvent, rect: Rect, ctx: &LayoutCtx<'_>) -> EventResult {
+        let inner       = inset_rect(rect, self.padding);
+        let child_c     = self.child_constraints(inner.size.y);
+        let cross_align = self.cross_align;
+        let spacing     = self.spacing;
+        let n           = self.children.len();
+
+        // Measure pass (immutable) to get each child's size.
+        let mut sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, ctx)).collect();
+
+        // Distribute remaining width to spacer (zero-sized) children.
+        let spacer_count = sizes.iter().filter(|s| s.x == 0.0 && s.y == 0.0).count();
+        if spacer_count > 0 {
+            let fixed_w: f32  = sizes.iter().map(|s| s.x).sum();
+            let spacing_total = (n.saturating_sub(1)) as f32 * spacing;
+            let remaining     = (inner.size.x - fixed_w - spacing_total).max(0.0);
+            let spacer_w      = remaining / spacer_count as f32;
+            for s in sizes.iter_mut() {
+                if s.x == 0.0 && s.y == 0.0 {
+                    s.x = spacer_w;
+                }
+            }
+        }
+
+        // Event-routing pass (mutable).
+        let mut x = inner.origin.x;
+        for (i, (child, s)) in self.children.iter_mut().zip(sizes.iter()).enumerate() {
+            let y = match cross_align {
+                Align::Stretch | Align::Start => inner.origin.y,
+                Align::Center => inner.origin.y + (inner.size.y - s.y) * 0.5,
+                Align::End    => inner.origin.y + (inner.size.y - s.y),
+            };
+            let child_rect = Rect::new(x, y, s.x, s.y);
+            if child.on_event(event, child_rect, ctx).is_consumed() {
                 return EventResult::Consumed;
+            }
+            x += s.x;
+            if i + 1 < n {
+                x += spacing;
             }
         }
         EventResult::Ignored

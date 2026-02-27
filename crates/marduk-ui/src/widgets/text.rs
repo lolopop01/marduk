@@ -46,7 +46,7 @@ impl Widget for Text {
         painter.text(&self.text, self.font, self.size, self.color, rect.origin, max_w);
     }
 
-    fn on_event(&mut self, _event: &UiEvent, _rect: Rect) -> EventResult {
+    fn on_event(&mut self, _event: &UiEvent, _rect: Rect, _ctx: &LayoutCtx<'_>) -> EventResult {
         EventResult::Ignored
     }
 }

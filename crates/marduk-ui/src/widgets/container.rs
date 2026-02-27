@@ -117,9 +117,9 @@ impl Widget for Container {
         }
     }
 
-    fn on_event(&mut self, event: &UiEvent, rect: Rect) -> EventResult {
+    fn on_event(&mut self, event: &UiEvent, rect: Rect, ctx: &LayoutCtx<'_>) -> EventResult {
         if let Some(child) = &mut self.child {
-            child.on_event(event, inset_rect(rect, self.padding))
+            child.on_event(event, inset_rect(rect, self.padding), ctx)
         } else {
             EventResult::Ignored
         }

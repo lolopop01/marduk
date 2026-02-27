@@ -95,7 +95,8 @@ impl UiScene {
             root.paint(&mut painter, rect);
         }
         if input.mouse_clicked {
-            root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect);
+            let ctx = LayoutCtx { fonts: &self.font_system };
+            root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
         }
         &mut self.draw_list
     }
@@ -144,7 +145,8 @@ impl UiScene {
 
         // ── events ────────────────────────────────────────────────────────
         if input.mouse_clicked {
-            root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect);
+            let ctx = LayoutCtx { fonts: &self.font_system };
+            root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
         }
 
         &mut self.draw_list

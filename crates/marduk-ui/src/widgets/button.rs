@@ -124,7 +124,7 @@ impl Widget for Button {
         self.child.paint(painter, inset_rect(rect, self.padding));
     }
 
-    fn on_event(&mut self, event: &UiEvent, rect: Rect) -> EventResult {
+    fn on_event(&mut self, event: &UiEvent, rect: Rect, _ctx: &LayoutCtx<'_>) -> EventResult {
         if let UiEvent::Click { pos } = event {
             if rect.contains(*pos) {
                 if let Some(f) = &mut self.on_click {
