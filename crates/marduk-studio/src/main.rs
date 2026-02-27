@@ -13,6 +13,8 @@ use marduk_engine::render::shapes::text::TextRenderer;
 use marduk_engine::scene::{Border, DrawList, ZIndex};
 use marduk_engine::text::{FontId, FontSystem};
 use marduk_engine::window::{Runtime, RuntimeConfig};
+use marduk_ui::dsl::{DslBindings, DslDocument, DslLoader};
+use marduk_ui::scene::{UiInput, UiScene};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // "Windows 11 dark mode Explorer" inspired mock UI.
@@ -39,6 +41,12 @@ struct StudioApp {
     // Simple UI state for "selection" and fake scrolling.
     selected: usize,
     scroll_y: f32,
+
+    // DSL-driven UI overlay (titlebar + toolbar).
+    ui_scene:    UiScene,
+    ui_loader:   DslLoader,
+    ui_doc:      DslDocument,
+    ui_bindings: DslBindings,
 }
 
 impl StudioApp {
@@ -65,6 +73,38 @@ impl StudioApp {
             log::warn!("No system font found — text will not render");
         }
 
+        // ── DSL UI overlay ────────────────────────────────────────────────
+        let mut ui_scene = UiScene::new();
+        let ui_font = [
+            "/usr/share/fonts/TTF/SegoeUI.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/OpenSans-Regular.ttf",
+            "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+        ]
+        .iter()
+        .find_map(|path| {
+            std::fs::read(path)
+                .ok()
+                .and_then(|bytes| ui_scene.load_font(&bytes).ok())
+        });
+
+        let mut ui_loader = DslLoader::new();
+        ui_loader
+            .parse_and_register("Titlebar", include_str!("../ui/titlebar.mkml"))
+            .expect("titlebar.mkml parse error");
+        ui_loader
+            .parse_and_register("Toolbar", include_str!("../ui/toolbar.mkml"))
+            .expect("toolbar.mkml parse error");
+        let ui_doc = ui_loader
+            .parse(include_str!("../ui/main.mkml"))
+            .expect("main.mkml parse error");
+
+        let mut ui_bindings = DslBindings::new();
+        if let Some(f) = ui_font {
+            ui_bindings.fonts.insert("body".to_string(), f);
+        }
+
         Self {
             draw_list: DrawList::new(),
             font_system,
@@ -75,6 +115,10 @@ impl StudioApp {
             text_renderer:         TextRenderer::new(),
             selected: 2,
             scroll_y: 0.0,
+            ui_scene,
+            ui_loader,
+            ui_doc,
+            ui_bindings,
         }
     }
 }
@@ -739,21 +783,58 @@ impl App for StudioApp {
             }
         }
 
+        // ── DSL UI overlay ────────────────────────────────────────────────
+        // Build and layout the DSL widget tree (titlebar + toolbar) over the
+        // top of the window. The overlay uses a fresh UiScene draw list.
+        {
+            let (mx, my) = ctx.input.pointer_pos.unwrap_or((0.0, 0.0));
+            let ui_input = UiInput {
+                mouse_pos:     Vec2::new(mx, my),
+                mouse_pressed: ctx.input.button_down(marduk_engine::input::MouseButton::Left),
+                mouse_clicked: ctx.input_frame.buttons_released
+                    .contains(&marduk_engine::input::MouseButton::Left),
+            };
+            let viewport = Vec2::new(w, h);
+            let root = self.ui_loader.build(&self.ui_doc, &self.ui_bindings);
+            self.ui_scene.frame(root, viewport, &ui_input);
+
+            // Drain and handle events fired by DSL buttons this frame.
+            for event in self.ui_bindings.take_events() {
+                match event.as_str() {
+                    "window_minimize" => log::info!("minimize"),
+                    "window_maximize" => log::info!("maximize"),
+                    "window_close"    => return AppControl::Exit,
+                    "nav_back"        => log::info!("nav back"),
+                    "nav_forward"     => log::info!("nav forward"),
+                    "new_folder"      => log::info!("new folder"),
+                    "upload_file"     => log::info!("upload file"),
+                    other             => log::info!("dsl event: {other}"),
+                }
+            }
+        }
+
         // ── render ────────────────────────────────────────────────────────
         // Split borrows before the closure so the borrow checker can see that
         // the renderer fields and the draw_list/font_system are distinct.
-        let dl = &mut self.draw_list;
-        let fs = &self.font_system;
+        let dl    = &mut self.draw_list;
+        let fs    = &self.font_system;
+        let ui_dl = &mut self.ui_scene.draw_list;
+        let ui_fs = &self.ui_scene.font_system;
         let r_rect  = &mut self.rect_renderer;
         let r_rrect = &mut self.rounded_rect_renderer;
         let r_circ  = &mut self.circle_renderer;
         let r_text  = &mut self.text_renderer;
 
         ctx.render(win11::bg(), |rctx, target| {
+            // Base draw list (existing explorer UI).
             r_rect.render(rctx, target, dl);
             r_rrect.render(rctx, target, dl);
             r_circ.render(rctx, target, dl);
             r_text.render(rctx, target, dl, fs);
+            // DSL overlay draw list.
+            r_rect.render(rctx, target, ui_dl);
+            r_rrect.render(rctx, target, ui_dl);
+            r_text.render(rctx, target, ui_dl, ui_fs);
         })
     }
 }

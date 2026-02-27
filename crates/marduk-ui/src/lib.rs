@@ -41,6 +41,7 @@
 //! ```
 
 pub mod constraints;
+pub mod dsl;
 pub mod event;
 pub mod painter;
 pub mod scene;
@@ -66,4 +67,7 @@ pub mod prelude {
     pub use marduk_engine::paint::{Color, Paint};
     pub use marduk_engine::scene::Border;
     pub use marduk_engine::text::FontId;
+
+    // DSL
+    pub use crate::dsl::{DslBindings, DslDocument, DslLoader, ParseError};
 }

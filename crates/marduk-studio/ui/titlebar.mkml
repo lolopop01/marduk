@@ -1,0 +1,24 @@
+// Window titlebar with app name and window controls.
+Row [cross_align=center] {
+    // App name — fills available space on the left.
+    Text "Marduk Studio" [font=body, size=13, color=#ffffffff]
+
+    // Spacer — empty container that expands.
+    Container []
+
+    // Window control buttons.
+    Button "—" [font=body, font_size=13, text_color=#ffffffff,
+                on_click=window_minimize,
+                bg=#00000000, hover_bg=#ffffff1a, press_bg=#ffffff33,
+                corner_radius=0, padding=12]
+
+    Button "□" [font=body, font_size=13, text_color=#ffffffff,
+                on_click=window_maximize,
+                bg=#00000000, hover_bg=#ffffff1a, press_bg=#ffffff33,
+                corner_radius=0, padding=12]
+
+    Button "✕" [font=body, font_size=13, text_color=#ffffffff,
+                on_click=window_close,
+                bg=#00000000, hover_bg=#c42b1cff, press_bg=#a31b0eff,
+                corner_radius=0, padding=12]
+}

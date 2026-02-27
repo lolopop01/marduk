@@ -5,7 +5,7 @@ use marduk_engine::text::{FontId, FontSystem};
 use crate::constraints::{Constraints, LayoutCtx};
 use crate::event::UiEvent;
 use crate::painter::Painter;
-use crate::widget::Widget;
+use crate::widget::{Element, Widget};
 
 // ── UiInput ───────────────────────────────────────────────────────────────
 
@@ -52,7 +52,11 @@ pub struct UiScene {
     /// Fonts are public so the application can pass `&ui.font_system` to the
     /// engine's `TextRenderer::render`.
     pub font_system: FontSystem,
-    draw_list: DrawList,
+    /// Draw list populated by the most recent [`frame`] call.
+    ///
+    /// Public so callers can split-borrow it alongside `font_system` when
+    /// passing both to engine renderers.
+    pub draw_list: DrawList,
 }
 
 impl UiScene {
@@ -72,9 +76,19 @@ impl UiScene {
     /// until the next call to `frame`.
     ///
     /// Pass the returned list to each engine renderer in your render closure.
-    pub fn frame<W: Widget>(
+    /// Convenience: wrap any [`Widget`] in an [`Element`] and call [`frame`].
+    pub fn frame_widget<W: Widget>(
         &mut self,
-        mut root: W,
+        root: W,
+        viewport: Vec2,
+        input: &UiInput,
+    ) -> &mut DrawList {
+        self.frame(root.into(), viewport, input)
+    }
+
+    pub fn frame(
+        &mut self,
+        mut root: Element,
         viewport: Vec2,
         input: &UiInput,
     ) -> &mut DrawList {
