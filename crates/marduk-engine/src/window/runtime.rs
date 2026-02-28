@@ -136,6 +136,7 @@ where
             .context("failed to create window")?;
 
         window.set_visible(true);
+        window.set_ime_allowed(true);
         window.request_redraw();
         // Do not focus or request attention here; defer to resumed
 
@@ -256,12 +257,8 @@ where
         let mut exit_from_app_event = false;
 
         entry.with_mut(|fields| {
-            if let Some(ev) =
-                input_winit::translate_window_event(fields.window, fields.input_state, &event)
-            {
-                fields
-                    .input_state
-                    .apply_event(fields.input_frame, ev);
+            for ev in input_winit::translate_window_event(fields.window, fields.input_state, &event) {
+                fields.input_state.apply_event(fields.input_frame, ev);
             }
 
             if app.on_window_event(window_id, &event) == AppControl::Exit {

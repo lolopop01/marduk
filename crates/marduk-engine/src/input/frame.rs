@@ -25,6 +25,13 @@ pub struct InputFrame {
 
     /// Text committed this frame.
     pub text: Vec<TextEvent>,
+
+    /// Accumulated scroll wheel delta this frame.
+    ///
+    /// Positive = wheel moved in the "scroll down" direction (reveal content below).
+    /// Negative = scroll up. Line deltas are passed through as-is; pixel deltas
+    /// are normalised by dividing by 20 so both are in comparable "line" units.
+    pub scroll_delta: f32,
 }
 
 impl InputFrame {
@@ -35,6 +42,7 @@ impl InputFrame {
         self.buttons_pressed.clear();
         self.buttons_released.clear();
         self.text.clear();
+        self.scroll_delta = 0.0;
     }
 
     pub fn push_event(&mut self, ev: InputEvent) {

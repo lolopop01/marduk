@@ -8,28 +8,30 @@ use crate::input::{
     MouseWheelDelta, PointerButtonEvent, PointerMoveEvent, TextEvent,
 };
 
-/// Translates a winit `WindowEvent` into an engine `InputEvent`.
+/// Translates a winit `WindowEvent` into zero or more engine `InputEvent`s.
 ///
-/// Returns `None` for events not represented by the input subsystem.
+/// Keyboard events may produce two events: a `Key` event (for control actions
+/// like Backspace, Enter, arrow keys) *and* a `Text` event (for printable
+/// characters). All other window events produce at most one event.
 pub fn translate_window_event(
     window: &Window,
     state: &InputState,
     event: &WindowEvent,
-) -> Option<InputEvent> {
+) -> Vec<InputEvent> {
     match event {
         WindowEvent::ModifiersChanged(m) => {
             // winit 0.30: ModifiersChanged carries a wrapper with `.state()`.
             let ms: ModifiersState = m.state();
-            Some(InputEvent::ModifiersChanged(map_modifiers(ms)))
+            vec![InputEvent::ModifiersChanged(map_modifiers(ms))]
         }
 
-        WindowEvent::Focused(f) => Some(InputEvent::Focused(*f)),
+        WindowEvent::Focused(f) => vec![InputEvent::Focused(*f)],
 
-        WindowEvent::CursorLeft { .. } => Some(InputEvent::PointerLeft),
+        WindowEvent::CursorLeft { .. } => vec![InputEvent::PointerLeft],
 
         WindowEvent::CursorMoved { position, .. } => {
             let (x, y) = to_logical_f32(window, *position);
-            Some(InputEvent::PointerMoved(PointerMoveEvent { x, y }))
+            vec![InputEvent::PointerMoved(PointerMoveEvent { x, y })]
         }
 
         WindowEvent::MouseInput { state: st, button, .. } => {
@@ -46,13 +48,13 @@ pub fn translate_window_event(
             // winit 0.30 does not expose cursor query; use tracked pointer position.
             let (x, y) = state.pointer_pos.unwrap_or((0.0, 0.0));
 
-            Some(InputEvent::PointerButton(PointerButtonEvent {
+            vec![InputEvent::PointerButton(PointerButtonEvent {
                 button,
                 state: st,
                 x,
                 y,
                 modifiers,
-            }))
+            })]
         }
 
         WindowEvent::MouseWheel { delta, .. } => {
@@ -64,7 +66,7 @@ pub fn translate_window_event(
                     MouseWheelDelta::Pixel { x, y }
                 }
             };
-            Some(InputEvent::MouseWheel { delta, modifiers })
+            vec![InputEvent::MouseWheel { delta, modifiers }]
         }
 
         WindowEvent::KeyboardInput { event, .. } => {
@@ -76,23 +78,42 @@ pub fn translate_window_event(
 
             let (key, code) = map_key(event.physical_key);
 
-            Some(InputEvent::Key {
+            let mut events = vec![InputEvent::Key {
                 key,
                 state: st,
                 modifiers,
                 code,
                 repeat: event.repeat,
-            })
+            }];
+
+            // Also emit a Text event for printable characters on key press.
+            // `event.text` is the platform's text representation of the key,
+            // already accounting for keyboard layout, dead keys, and shift state.
+            // Skip text when control shortcuts are active (Ctrl+C, Alt+F, …).
+            if event.state == ElementState::Pressed {
+                if let Some(text) = &event.text {
+                    let s = text.as_str();
+                    if !s.is_empty()
+                        && !modifiers.ctrl
+                        && !modifiers.alt
+                        && !modifiers.meta
+                    {
+                        events.push(InputEvent::Text(TextEvent { text: s.to_string() }));
+                    }
+                }
+            }
+
+            events
         }
 
         WindowEvent::Ime(ime) => match ime {
-            winit::event::Ime::Commit(text) if !text.is_empty() => Some(InputEvent::Text(TextEvent {
-                text: text.clone(),
-            })),
-            _ => None,
+            winit::event::Ime::Commit(text) if !text.is_empty() => {
+                vec![InputEvent::Text(TextEvent { text: text.clone() })]
+            }
+            _ => vec![],
         },
 
-        _ => None,
+        _ => vec![],
     }
 }
 

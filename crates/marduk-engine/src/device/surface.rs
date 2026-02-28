@@ -35,24 +35,6 @@ pub(crate) fn choose_alpha_mode(
         .unwrap_or(wgpu::CompositeAlphaMode::Auto)
 }
 
-pub(crate) fn make_surface_config(
-    size: PhysicalSize<u32>,
-    init: &GpuInit,
-    format: wgpu::TextureFormat,
-    alpha_mode: wgpu::CompositeAlphaMode,
-) -> wgpu::SurfaceConfiguration {
-    wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format,
-        width: size.width.max(1),
-        height: size.height.max(1),
-        present_mode: init.present_mode,
-        alpha_mode,
-        view_formats: vec![],
-        desired_maximum_frame_latency: init.desired_maximum_frame_latency,
-    }
-}
-
 pub(crate) fn apply_resize(
     surface: &wgpu::Surface,
     device: &wgpu::Device,

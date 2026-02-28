@@ -7,7 +7,7 @@ use marduk_engine::scene::Border;
 use marduk_engine::text::FontId;
 
 use crate::constraints::Edges;
-use crate::dsl::ast::{DslDocument, Node};
+use crate::dsl::ast::{DslDocument, Node, Value};
 use crate::dsl::error::ParseError;
 use crate::dsl::parser::parse_str;
 use crate::widget::Element;
@@ -18,7 +18,9 @@ use crate::widgets::{
     flex::{Align, Column, Row},
     progress::ProgressBar,
     radio::RadioGroup,
+    scroll::ScrollView,
     slider::Slider,
+    stack::{AnchorVal, SizeHint, Stack, StackItem},
     text::Text,
     textbox::TextBox,
     toggle::Toggle,
@@ -135,6 +137,8 @@ impl DslLoader {
             "RadioGroup"  => self.build_radio_group(node, bindings),
             "ProgressBar" => self.build_progress_bar(node, bindings),
             "TextBox"     => self.build_textbox(node, bindings),
+            "ScrollView"  => self.build_scroll_view(node, bindings),
+            "Stack"       => self.build_stack(node, bindings),
             alias => {
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
@@ -561,6 +565,74 @@ impl DslLoader {
         pb.into()
     }
 
+    // ── ScrollView ────────────────────────────────────────────────────────
+
+    fn build_scroll_view(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("state_key")
+            .or_else(|| node.prop_str("on_scroll"))
+            .map(|s| s.to_string());
+
+        let default_offset = node.prop_f32("offset").unwrap_or(0.0);
+        let offset = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Float(v)) => *v,
+                _ => default_offset,
+            }
+        } else {
+            default_offset
+        };
+
+        let child: Element = if let Some(child_node) = node.children.first() {
+            self.build_node(child_node, bindings)
+        } else {
+            Container::new().into()
+        };
+
+        let mut sv = ScrollView::new(child).scroll_to(offset);
+
+        if let Some(v) = node.prop_f32("line_height")      { sv = sv.line_height(v); }
+        if let Some(v) = node.prop_f32("show_scrollbar")   { sv = sv.show_scrollbar(v != 0.0); }
+
+        if let Some(event_name) = node.prop_str("on_scroll") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            sv = sv.on_scroll(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        sv.into()
+    }
+
+    // ── Stack ─────────────────────────────────────────────────────────────
+
+    fn build_stack(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let mut stack = Stack::new();
+
+        if let Some(v) = parse_size_hint(node, "width")  { stack = stack.width(v); }
+        if let Some(v) = parse_size_hint(node, "height") { stack = stack.height(v); }
+        if let Some(v) = node.prop_color("bg")           { stack = stack.bg(v); }
+
+        for child_node in &node.children {
+            let element = self.build_node(child_node, bindings);
+            let item = StackItem {
+                element,
+                left:   parse_anchor_val(child_node, "left"),
+                top:    parse_anchor_val(child_node, "top"),
+                right:  parse_anchor_val(child_node, "right"),
+                bottom: parse_anchor_val(child_node, "bottom"),
+                width:  parse_size_hint(child_node, "width").unwrap_or(SizeHint::Natural),
+                height: parse_size_hint(child_node, "height").unwrap_or(SizeHint::Natural),
+            };
+            stack = stack.item(item);
+        }
+
+        stack.into()
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     /// Wrap `elem` in a Container when the node carries visual decoration
@@ -637,5 +709,35 @@ impl DslLoader {
 impl Default for DslLoader {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ── DSL property helpers for anchor/size types ────────────────────────────
+
+/// Parse a `SizeHint` from a node property.
+///
+/// Accepts:
+/// - `Number(v)` → `SizeHint::Px(v)`
+/// - `Ident("fill")` / `Str("fill")` → `SizeHint::Fill`
+fn parse_size_hint(node: &Node, key: &str) -> Option<SizeHint> {
+    match node.prop(key)? {
+        Value::Number(v) => Some(SizeHint::Px(*v)),
+        Value::Ident(s) | Value::Str(s) => match s.as_str() {
+            "fill"    => Some(SizeHint::Fill),
+            "natural" => Some(SizeHint::Natural),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Parse an `AnchorVal` from a node property.
+///
+/// Accepts:
+/// - `Number(v)` → `AnchorVal::Px(v)`
+fn parse_anchor_val(node: &Node, key: &str) -> Option<AnchorVal> {
+    match node.prop(key)? {
+        Value::Number(v) => Some(AnchorVal::Px(*v)),
+        _ => None,
     }
 }

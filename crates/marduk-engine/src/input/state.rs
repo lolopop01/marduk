@@ -8,6 +8,7 @@ use super::types::{
     Modifiers,
     MouseButton,
     MouseButtonState,
+    MouseWheelDelta,
     PointerButtonEvent,
     PointerMoveEvent,
     TextEvent,
@@ -111,8 +112,13 @@ impl InputState {
                 }
             }
 
-            InputEvent::MouseWheel { modifiers, .. } => {
+            InputEvent::MouseWheel { delta, modifiers } => {
                 self.modifiers = *modifiers;
+                let y = match delta {
+                    MouseWheelDelta::Line { y, .. } => *y,
+                    MouseWheelDelta::Pixel { y, .. } => *y / 20.0,
+                };
+                frame.scroll_delta += y;
             }
 
             InputEvent::Text(TextEvent { text: _ }) => {

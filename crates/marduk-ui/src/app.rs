@@ -290,6 +290,7 @@ impl EngineApp for UiAppState {
             mouse_clicked: ctx.input_frame.buttons_released.contains(&MouseButton::Left),
             text_input:    ctx.input_frame.text.iter().map(|t| t.text.clone()).collect(),
             keys_pressed:  ctx.input_frame.keys_pressed.iter().copied().collect(),
+            scroll_delta:  ctx.input_frame.scroll_delta,
         };
 
         // ── Layout + paint ────────────────────────────────────────────────

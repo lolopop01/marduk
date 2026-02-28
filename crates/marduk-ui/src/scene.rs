@@ -25,6 +25,8 @@ pub struct UiInput {
     pub text_input: Vec<String>,
     /// Named keys pressed this frame (Backspace, Enter, …).
     pub keys_pressed: Vec<Key>,
+    /// Accumulated scroll wheel delta this frame (positive = scroll down).
+    pub scroll_delta: f32,
 }
 
 // ── UiScene ───────────────────────────────────────────────────────────────
@@ -110,6 +112,9 @@ impl UiScene {
             for key in &input.keys_pressed {
                 root.on_event(&UiEvent::KeyPress { key: *key }, rect, &ctx);
             }
+            if input.scroll_delta != 0.0 {
+                root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta }, rect, &ctx);
+            }
         }
         &mut self.draw_list
     }
@@ -167,6 +172,9 @@ impl UiScene {
             }
             for key in &input.keys_pressed {
                 root.on_event(&UiEvent::KeyPress { key: *key }, rect, &ctx);
+            }
+            if input.scroll_delta != 0.0 {
+                root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta }, rect, &ctx);
             }
         }
 

@@ -12,6 +12,10 @@ pub enum UiEvent {
     TextInput { text: String },
     /// Named key pressed (Backspace, Enter, arrow keys, …).
     KeyPress { key: Key },
+    /// Mouse wheel / trackpad scroll.
+    ///
+    /// `delta` > 0 → scroll down (reveal content below); < 0 → scroll up.
+    ScrollWheel { delta: f32 },
 }
 
 /// Result returned by [`Widget::on_event`].
