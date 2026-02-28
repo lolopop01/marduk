@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Marduk Markup Language",
+  "scopeName": "source.mkml",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#import-statement" },
+    { "include": "#string" },
+    { "include": "#color" },
+    { "include": "#number" },
+    { "include": "#property-key" },
+    { "include": "#widget-name" },
+    { "include": "#brace" },
+    { "include": "#colon" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.mkml",
+      "match": "//.*$"
+    },
+    "import-statement": {
+      "match": "\\b(import|as)\\b",
+      "captures": {
+        "1": { "name": "keyword.control.import.mkml" }
+      }
+    },
+    "string": {
+      "name": "string.quoted.double.mkml",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.mkml", "match": "\\\\." }
+      ]
+    },
+    "color": {
+      "name": "constant.other.color.mkml",
+      "match": "#[0-9a-fA-F]+"
+    },
+    "number": {
+      "name": "constant.numeric.decimal.mkml",
+      "match": "-?\\b\\d+(\\.\\d+)?\\b"
+    },
+    "property-key": {
+      "name": "variable.other.property.mkml",
+      "match": "\\b([a-z_][a-zA-Z0-9_]*)\\s*(?=:)"
+    },
+    "widget-name": {
+      "name": "entity.name.type.mkml",
+      "match": "\\b[A-Z][a-zA-Z0-9]*\\b"
+    },
+    "brace": {
+      "name": "punctuation.section.block.mkml",
+      "match": "[{}]"
+    },
+    "colon": {
+      "name": "punctuation.separator.mkml",
+      "match": ":"
+    }
+  }
+}

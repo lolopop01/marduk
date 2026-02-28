@@ -9,6 +9,11 @@ editors/rustrover/.gradle/
 editors/rustrover/build/
 editors/rustrover/local.properties
 
+# VS Code extension (editors/vscode)
+editors/vscode/node_modules/
+editors/vscode/out/
+editors/vscode/*.vsix
+
 # Kotlin/IDE sessions
 **/.kotlin/
 **/.kotlin/sessions/
