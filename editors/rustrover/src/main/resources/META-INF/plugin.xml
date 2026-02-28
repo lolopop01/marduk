@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin>
+    <id>com.marduk.lsp</id>
+    <name>Marduk Markup Language</name>
+    <version>0.1.0</version>
+    <vendor>marduk</vendor>
+
+    <description>
+        Language support for .mkml (Marduk Markup Language) files.
+
+        Powered by the marduk-lsp language server (cargo run -p marduk-lsp).
+        Provides:
+        - Real-time parse diagnostics
+        - Hover documentation for widgets and properties
+        - Context-aware completions (widget names, property keys, enum values, colors)
+    </description>
+
+    <!-- Required by all IntelliJ Platform plugins. -->
+    <depends>com.intellij.modules.platform</depends>
+    <!-- Built-in LSP client — available in IntelliJ IDEA Ultimate, RustRover,
+         WebStorm, and other paid JetBrains IDEs since 2023.2.             -->
+    <depends>com.intellij.modules.lsp</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+
+        <!-- Register .mkml as a known file type. -->
+        <fileType
+            name="Marduk Markup Language"
+            implementationClass="com.marduk.lsp.MardukFileType"
+            fieldName="INSTANCE"
+            language="Marduk"
+            extensions="mkml"/>
+
+        <!-- Hook into the built-in LSP client. -->
+        <platform.lsp.serverSupportProvider
+            implementation="com.marduk.lsp.MardukLspServerSupportProvider"/>
+
+    </extensions>
+</idea-plugin>

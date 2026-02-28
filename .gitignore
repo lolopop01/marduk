@@ -3,3 +3,8 @@
 Cargo.lock
 .DS_Store
 .idea/
+
+# Gradle (editors/rustrover)
+editors/rustrover/.gradle/
+editors/rustrover/build/
+editors/rustrover/local.properties
