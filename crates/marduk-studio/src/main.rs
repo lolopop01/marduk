@@ -207,7 +207,10 @@ fn main() {
             println!("  Status  ... QUEUED");
             println!();
         })
-        .on_event("comms_clear",            || println!("  [COMMS] Draft cleared."))
+        .on_event_state("comms_clear", |state| {
+            state.clear("comms_message");
+            println!("  [COMMS] Draft cleared.");
+        })
         .on_event("window_close", || std::process::exit(0))
         .run(include_str!("../ui/main.mkml"))
 }

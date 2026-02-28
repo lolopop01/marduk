@@ -114,11 +114,13 @@ impl InputState {
 
             InputEvent::MouseWheel { delta, modifiers } => {
                 self.modifiers = *modifiers;
+                // winit LineDelta: positive y = scroll up (content moves up).
+                // Our convention: positive scroll_delta = scroll down (more content below).
                 let y = match delta {
                     MouseWheelDelta::Line { y, .. } => *y,
                     MouseWheelDelta::Pixel { y, .. } => *y / 20.0,
                 };
-                frame.scroll_delta += y;
+                frame.scroll_delta -= y;
             }
 
             InputEvent::Text(TextEvent { text: _ }) => {

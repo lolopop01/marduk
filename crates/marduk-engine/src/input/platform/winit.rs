@@ -90,15 +90,17 @@ pub fn translate_window_event(
             // `event.text` is the platform's text representation of the key,
             // already accounting for keyboard layout, dead keys, and shift state.
             // Skip text when control shortcuts are active (Ctrl+C, Alt+F, …).
+            // Filter out control characters (backspace = \x08, etc.) — those are
+            // handled as Key events and must not also arrive as text input.
             if event.state == ElementState::Pressed {
                 if let Some(text) = &event.text {
-                    let s = text.as_str();
-                    if !s.is_empty()
+                    let printable: String = text.chars().filter(|c| !c.is_control()).collect();
+                    if !printable.is_empty()
                         && !modifiers.ctrl
                         && !modifiers.alt
                         && !modifiers.meta
                     {
-                        events.push(InputEvent::Text(TextEvent { text: s.to_string() }));
+                        events.push(InputEvent::Text(TextEvent { text: printable }));
                     }
                 }
             }

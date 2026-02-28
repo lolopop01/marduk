@@ -84,5 +84,5 @@ pub mod prelude {
     pub use crate::dsl::{DslBindings, DslDocument, DslLoader, ParseError};
 
     // Application (entry point for end-user apps)
-    pub use crate::app::{Application, FontMap};
+    pub use crate::app::{Application, FontMap, WidgetState};
 }

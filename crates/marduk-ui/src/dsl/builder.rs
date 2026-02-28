@@ -63,6 +63,19 @@ impl DslBindings {
         }
     }
 
+    /// Create bindings that share an existing `widget_state` map.
+    ///
+    /// Used by `Application` so event handlers registered with
+    /// `on_event_state` share the same map as the DSL widget tree.
+    pub fn with_state(widget_state: Rc<RefCell<HashMap<String, WidgetStateValue>>>) -> Self {
+        Self {
+            fonts: HashMap::new(),
+            event_queue: Rc::new(RefCell::new(Vec::new())),
+            widget_state,
+            focused_widget: Rc::new(RefCell::new(None)),
+        }
+    }
+
     pub fn with_font(mut self, name: impl Into<String>, id: FontId) -> Self {
         self.fonts.insert(name.into(), id);
         self

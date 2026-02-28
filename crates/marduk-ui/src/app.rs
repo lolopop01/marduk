@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use winit::dpi::LogicalSize;
 
@@ -15,8 +17,40 @@ use marduk_engine::window::{Runtime, RuntimeConfig};
 use marduk_engine::coords::Vec2;
 
 use crate::dsl::{DslBindings, DslDocument, DslLoader};
+use crate::dsl::builder::WidgetStateValue;
 use crate::scene::{UiInput, UiScene};
 use crate::widget::Element;
+
+// ── WidgetState ───────────────────────────────────────────────────────────
+
+/// Handle passed to `on_event_state` callbacks for reading/writing DSL widget state.
+///
+/// Widget state is keyed by the `state_key` property set on stateful widgets
+/// (TextBox, Checkbox, Toggle, Slider, RadioGroup). Mutations take effect on
+/// the next frame rebuild.
+pub struct WidgetState(Rc<RefCell<HashMap<String, WidgetStateValue>>>);
+
+impl WidgetState {
+    /// Remove a widget's state entry (e.g. clear a TextBox).
+    pub fn clear(&mut self, key: &str) {
+        self.0.borrow_mut().remove(key);
+    }
+
+    /// Overwrite a text-valued state entry.
+    pub fn set_str(&mut self, key: &str, v: impl Into<String>) {
+        self.0.borrow_mut().insert(key.to_string(), WidgetStateValue::Str(v.into()));
+    }
+
+    /// Overwrite a boolean state entry (Checkbox, Toggle).
+    pub fn set_bool(&mut self, key: &str, v: bool) {
+        self.0.borrow_mut().insert(key.to_string(), WidgetStateValue::Bool(v));
+    }
+
+    /// Overwrite a float state entry (Slider).
+    pub fn set_float(&mut self, key: &str, v: f32) {
+        self.0.borrow_mut().insert(key.to_string(), WidgetStateValue::Float(v));
+    }
+}
 
 // ── FontMap ───────────────────────────────────────────────────────────────
 
@@ -76,6 +110,8 @@ pub struct Application {
     fonts:          Vec<(String, Vec<u8>)>,
     components:     Vec<(String, String)>,
     event_handlers: HashMap<String, Box<dyn FnMut()>>,
+    /// Shared widget state — created early so `on_event_state` closures can capture it.
+    widget_state:   Rc<RefCell<HashMap<String, WidgetStateValue>>>,
 }
 
 impl Application {
@@ -87,6 +123,7 @@ impl Application {
             fonts:          Vec::new(),
             components:     Vec::new(),
             event_handlers: HashMap::new(),
+            widget_state:   Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -123,6 +160,28 @@ impl Application {
     /// Register a callback for a named DSL event (e.g. `on_click=quit`).
     pub fn on_event(mut self, name: impl Into<String>, f: impl FnMut() + 'static) -> Self {
         self.event_handlers.insert(name.into(), Box::new(f));
+        self
+    }
+
+    /// Register a callback that can read and write DSL widget state.
+    ///
+    /// Use this when an event needs to mutate widget state — e.g. clearing a
+    /// TextBox when a "CLEAR" button is pressed.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// .on_event_state("comms_clear", |state| {
+    ///     state.clear("comms_message");
+    /// })
+    /// ```
+    pub fn on_event_state<F>(mut self, name: impl Into<String>, mut f: F) -> Self
+    where
+        F: FnMut(&mut WidgetState) + 'static,
+    {
+        let shared = self.widget_state.clone();
+        self.event_handlers.insert(name.into(), Box::new(move || {
+            f(&mut WidgetState(shared.clone()));
+        }));
         self
     }
 
@@ -257,7 +316,8 @@ impl UiAppState {
     /// Load fonts into a new `UiScene`, set up DSL loader, return both.
     fn setup_dsl(app: &Application) -> (UiScene, DslLoader, DslBindings) {
         let mut ui_scene = UiScene::new();
-        let mut bindings = DslBindings::new();
+        // Re-use the widget_state Rc that event handlers may already have captured.
+        let mut bindings = DslBindings::with_state(app.widget_state.clone());
 
         for (name, bytes) in &app.fonts {
             if let Ok(id) = ui_scene.load_font(bytes) {
