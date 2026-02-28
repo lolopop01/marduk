@@ -12,5 +12,5 @@ object MardukFileType : LanguageFileType(MardukLanguage) {
     override fun getName(): String        = "Marduk Markup Language"
     override fun getDescription(): String = "Marduk Markup Language (.mkml)"
     override fun getDefaultExtension(): String = "mkml"
-    override fun getIcon(): Icon?         = null
+    override fun getIcon(): Icon?          = MardukIcons.FILE
 }

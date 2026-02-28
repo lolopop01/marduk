@@ -1,19 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <idea-plugin>
     <id>com.marduk.lsp</id>
-    <name>Marduk Markup Language</name>
-    <version>0.1.0</version>
-    <vendor>marduk</vendor>
+    <name>Marduk Markup Language (.mkml)</name>
+    <version>1.0.1</version>
+    <vendor url="https://github.com/your-org/marduk">marduk</vendor>
 
-    <description>
-        Language support for .mkml (Marduk Markup Language) files.
+    <description><![CDATA[
+        <p>Full language support for <b>.mkml</b> (Marduk Markup Language) — the declarative UI
+        description language for the <a href="https://github.com/your-org/marduk">Marduk</a>
+        GPU-accelerated UI framework.</p>
 
-        Powered by the marduk-lsp language server (cargo run -p marduk-lsp).
-        Provides:
-        - Real-time parse diagnostics
-        - Hover documentation for widgets and properties
-        - Context-aware completions (widget names, property keys, enum values, colors)
-    </description>
+        <h3>Features</h3>
+        <ul>
+            <li><b>Syntax highlighting</b> — keywords, property keys, strings, color literals,
+                numbers, comments</li>
+            <li><b>Diagnostics</b> — real-time parse errors from the language server</li>
+            <li><b>Completions</b> — widget names, property keys, enum values, color literals</li>
+            <li><b>Hover docs</b> — inline documentation for every widget and property</li>
+        </ul>
+
+        <h3>Requirements</h3>
+        <p>The <code>marduk-lsp</code> binary must be reachable. The plugin looks for it at
+        <code>target/release/marduk-lsp</code> or <code>target/debug/marduk-lsp</code> inside
+        the open project, and falls back to <code>cargo run -p marduk-lsp</code> automatically.</p>
+    ]]></description>
 
     <!-- Required by all IntelliJ Platform plugins. -->
     <depends>com.intellij.modules.platform</depends>
@@ -30,6 +40,11 @@
             fieldName="INSTANCE"
             language="Marduk"
             extensions="mkml"/>
+
+        <!-- Syntax highlighting (lexer-based; semantic highlighting via LSP). -->
+        <lang.syntaxHighlighter
+            language="Marduk"
+            implementationClass="com.marduk.lsp.MardukSyntaxHighlighter"/>
 
         <!-- Hook into the built-in LSP client. -->
         <platform.lsp.serverSupportProvider

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <defs>
+    <!-- Background -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071625"/>
+      <stop offset="1" stop-color="#040a12"/>
+    </linearGradient>
+
+    <!-- Page surface -->
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b2236"/>
+      <stop offset="1" stop-color="#081a2b"/>
+    </linearGradient>
+
+    <!-- Fold highlight -->
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#13344f"/>
+      <stop offset="1" stop-color="#0a1f33"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Tile -->
+  <rect width="16" height="16" rx="3" fill="url(#bg)"/>
+  <rect x="0.75" y="0.75" width="14.5" height="14.5" rx="2.25"
+        fill="none" stroke="#12314a" stroke-width="0.75" opacity="0.9"/>
+
+  <!-- Page -->
+  <path d="M4 2.8h5.8L12 5v8.2c0 .9-.7 1.6-1.6 1.6H5.6C4.7 14.8 4 14.1 4 13.2V2.8z"
+        fill="url(#page)"/>
+
+  <!-- Folded corner -->
+  <path d="M9.8 2.8V5c0 .55.45 1 1 1H12z"
+        fill="url(#fold)"/>
+
+  <!-- Subtle text lines (markdown vibe) -->
+  <path d="M5.2 6.4h5.2M5.2 7.8h4.6" stroke="#163a57" stroke-width="0.7" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- The 'M' mark -->
+  <path d="M5.25 12.6V9.0l1.55 1.85L8.35 9.0v3.6"
+        fill="none"
+        stroke="#00e5a0"
+        stroke-width="1.55"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>

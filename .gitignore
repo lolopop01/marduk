@@ -8,3 +8,8 @@ Cargo.lock
 editors/rustrover/.gradle/
 editors/rustrover/build/
 editors/rustrover/local.properties
+
+# Kotlin/IDE sessions
+**/.kotlin/
+**/.kotlin/sessions/
+*.salive

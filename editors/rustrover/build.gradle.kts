@@ -4,7 +4,7 @@ plugins {
 }
 
 group   = "com.marduk"
-version = "0.1.0"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -15,7 +15,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaUltimate("2024.3")
+        rustRover("2025.3")
     }
 }
 
