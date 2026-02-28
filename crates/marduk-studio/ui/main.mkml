@@ -3,10 +3,31 @@ import "header.mkml"   as Header
 import "controls.mkml" as Controls
 import "settings.mkml" as Settings
 
-Column {
+// Stack fills the window. Children are anchored to its edges.
+// On resize, the header stays fixed at the top; the scroll area
+// stretches to fill whatever space remains below it.
+Stack {
     bg: #040810ff
 
-    Header { }
-    Controls { }
-    Settings { }
+    // Header — pinned to the top edge, full width, fixed height
+    Header {
+        top: 0
+        left: 0
+        right: 0
+        height: 47
+    }
+
+    // Scrollable content — fills everything below the header
+    ScrollView {
+        top: 47
+        left: 0
+        right: 0
+        bottom: 0
+        on_scroll: main_scroll
+
+        Column {
+            Controls { }
+            Settings { }
+        }
+    }
 }

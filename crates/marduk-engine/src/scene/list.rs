@@ -22,7 +22,7 @@ pub struct DrawItem {
 /// Use [`push_clip`] / [`pop_clip`] to scope draw commands to a scissor rect.
 /// Clips are intersected with the current parent, so nested scroll containers work correctly.
 ///
-/// ```
+/// ```rust,ignore
 /// draw_list.push_clip(scroll_container_rect);
 /// // ... push children ...
 /// draw_list.pop_clip();

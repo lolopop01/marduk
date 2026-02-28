@@ -187,6 +187,7 @@ fn main() {
             println!();
         })
         // ── SETTINGS ──────────────────────────────────────────────────────
+        .on_event("main_scroll",             || {}) // silent — scroll offset persists in bindings
         .on_event("reactor_power_changed",  || println!("  [POWER] Reactor level adjusted."))
         .on_event("shield_power_changed",   || println!("  [POWER] Shield generator output adjusted."))
         .on_event("engine_power_changed",   || println!("  [POWER] Engine throttle adjusted."))

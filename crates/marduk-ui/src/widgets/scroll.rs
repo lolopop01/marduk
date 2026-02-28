@@ -1,6 +1,7 @@
 use std::cell::Cell;
 
 use marduk_engine::coords::{Rect, Vec2};
+use marduk_engine::input::Key;
 use marduk_engine::paint::{Color, Paint};
 
 use crate::constraints::{Constraints, LayoutCtx};
@@ -151,13 +152,26 @@ impl Widget for ScrollView {
         match event {
             UiEvent::ScrollWheel { delta } => {
                 // Positive delta = scroll down (increase offset to reveal content below).
-                let max = (content_h - rect.size.y).max(0.0);
-                let prev = self.scroll_offset;
-                self.scroll_offset = (self.scroll_offset + delta * self.line_height).clamp(0.0, max);
-                if self.scroll_offset != prev {
-                    if let Some(f) = &mut self.on_scroll {
-                        f(self.scroll_offset);
-                    }
+                self.apply_scroll(*delta * self.line_height, content_h, rect.size.y);
+                EventResult::Consumed
+            }
+
+            UiEvent::KeyPress { key } => {
+                // Route to child first — a focused TextBox should eat arrow keys.
+                let content_rect = self.content_rect(rect, content_h);
+                if self.child.on_event(event, content_rect, ctx) == EventResult::Consumed {
+                    return EventResult::Consumed;
+                }
+                // Child didn't consume it — try keyboard scrolling.
+                let page = rect.size.y * 0.9;
+                match key {
+                    Key::ArrowDown  => self.apply_scroll( self.line_height, content_h, rect.size.y),
+                    Key::ArrowUp    => self.apply_scroll(-self.line_height, content_h, rect.size.y),
+                    Key::PageDown   => self.apply_scroll( page,             content_h, rect.size.y),
+                    Key::PageUp     => self.apply_scroll(-page,             content_h, rect.size.y),
+                    Key::Home       => self.apply_scroll(f32::NEG_INFINITY, content_h, rect.size.y),
+                    Key::End        => self.apply_scroll(f32::INFINITY,     content_h, rect.size.y),
+                    _ => return EventResult::Ignored,
                 }
                 EventResult::Consumed
             }
@@ -167,6 +181,20 @@ impl Widget for ScrollView {
                 // hit-testing uses content-space coordinates.
                 let content_rect = self.content_rect(rect, content_h);
                 self.child.on_event(other, content_rect, ctx)
+            }
+        }
+    }
+
+}
+
+impl ScrollView {
+    fn apply_scroll(&mut self, delta: f32, content_h: f32, viewport_h: f32) {
+        let max = (content_h - viewport_h).max(0.0);
+        let prev = self.scroll_offset;
+        self.scroll_offset = (self.scroll_offset + delta).clamp(0.0, max);
+        if self.scroll_offset != prev {
+            if let Some(f) = &mut self.on_scroll {
+                f(self.scroll_offset);
             }
         }
     }

@@ -124,9 +124,9 @@ impl<'s> Lexer<'s> {
             self.advance();
             count += 1;
         }
-        if count != 8 {
+        if count != 6 && count != 8 {
             return Err(ParseError::new(format!(
-                "color literal must be #rrggbbaa (8 hex digits), got {} digits",
+                "color literal must be #rrggbb or #rrggbbaa, got {} digits",
                 count
             )));
         }
@@ -134,7 +134,7 @@ impl<'s> Lexer<'s> {
         let r = u8::from_str_radix(&hex[0..2], 16).unwrap();
         let g = u8::from_str_radix(&hex[2..4], 16).unwrap();
         let b = u8::from_str_radix(&hex[4..6], 16).unwrap();
-        let a = u8::from_str_radix(&hex[6..8], 16).unwrap();
+        let a = if count == 8 { u8::from_str_radix(&hex[6..8], 16).unwrap() } else { 255 };
         let color = Color::from_straight(
             r as f32 / 255.0,
             g as f32 / 255.0,

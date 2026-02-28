@@ -182,9 +182,7 @@ impl Widget for TextBox {
                 match key {
                     Key::Backspace => {
                         // Remove last UTF-8 character
-                        let mut chars = self.text.chars();
-                        chars.next_back();
-                        self.text = chars.as_str().to_string();
+                        self.text.pop();
                         if let Some(f) = &mut self.on_change { f(self.text.clone()); }
                         EventResult::Consumed
                     }

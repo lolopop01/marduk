@@ -103,6 +103,7 @@ impl UiScene {
         }
         {
             let ctx = LayoutCtx { fonts: &self.font_system };
+            root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
             if input.mouse_clicked {
                 root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
             }
@@ -164,6 +165,7 @@ impl UiScene {
         // ── events ────────────────────────────────────────────────────────
         {
             let ctx = LayoutCtx { fonts: &self.font_system };
+            root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
             if input.mouse_clicked {
                 root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
             }
