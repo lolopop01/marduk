@@ -267,6 +267,9 @@ struct UiAppState {
 
     // Event dispatch
     event_handlers: HashMap<String, Box<dyn FnMut()>>,
+
+    // Drag tracking — position where the current mouse drag started (None when not dragging).
+    drag_origin: Option<Vec2>,
 }
 
 impl UiAppState {
@@ -286,6 +289,7 @@ impl UiAppState {
             bindings,
             root:                  None,
             event_handlers:        app.event_handlers,
+            drag_origin:           None,
         }
     }
 
@@ -310,6 +314,7 @@ impl UiAppState {
             bindings,
             root:                  Some(root),
             event_handlers:        app.event_handlers,
+            drag_origin:           None,
         }
     }
 
@@ -344,13 +349,24 @@ impl EngineApp for UiAppState {
         let viewport = Vec2::new(w, h);
 
         let (mx, my) = ctx.input.pointer_pos.unwrap_or((0.0, 0.0));
+        let mouse_pos = Vec2::new(mx, my);
+
+        // Track where the current drag started.
+        if ctx.input_frame.buttons_pressed.contains(&MouseButton::Left) {
+            self.drag_origin = Some(mouse_pos);
+        }
+        if ctx.input_frame.buttons_released.contains(&MouseButton::Left) {
+            self.drag_origin = None;
+        }
+
         let ui_input = UiInput {
-            mouse_pos:     Vec2::new(mx, my),
+            mouse_pos,
             mouse_pressed: ctx.input.button_down(MouseButton::Left),
             mouse_clicked: ctx.input_frame.buttons_released.contains(&MouseButton::Left),
             text_input:    ctx.input_frame.text.iter().map(|t| t.text.clone()).collect(),
             keys_pressed:  ctx.input_frame.keys_pressed.iter().copied().collect(),
             scroll_delta:  ctx.input_frame.scroll_delta,
+            drag_origin:   self.drag_origin,
         };
 
         // ── Layout + paint ────────────────────────────────────────────────

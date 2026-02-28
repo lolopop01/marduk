@@ -8,6 +8,9 @@ pub enum UiEvent {
     Click { pos: Vec2 },
     /// Mouse moved to `pos` (fired every frame).
     Hover { pos: Vec2 },
+    /// Mouse moved while the primary button is held.
+    /// `pos` is the current cursor position; `start` is where the drag began.
+    Drag { pos: Vec2, start: Vec2 },
     /// Committed text input (one or more characters).
     TextInput { text: String },
     /// Named key pressed (Backspace, Enter, arrow keys, …).

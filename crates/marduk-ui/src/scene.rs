@@ -27,6 +27,8 @@ pub struct UiInput {
     pub keys_pressed: Vec<Key>,
     /// Accumulated scroll wheel delta this frame (positive = scroll down).
     pub scroll_delta: f32,
+    /// Where the current mouse drag started (`None` when no drag is in progress).
+    pub drag_origin: Option<Vec2>,
 }
 
 // ── UiScene ───────────────────────────────────────────────────────────────
@@ -105,6 +107,9 @@ impl UiScene {
         {
             let ctx = LayoutCtx { fonts: &self.font_system };
             root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
+            if let Some(start) = input.drag_origin {
+                root.on_event(&UiEvent::Drag { pos: input.mouse_pos, start }, rect, &ctx);
+            }
             if input.mouse_clicked {
                 root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
             }
@@ -169,6 +174,9 @@ impl UiScene {
         {
             let ctx = LayoutCtx { fonts: &self.font_system };
             root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
+            if let Some(start) = input.drag_origin {
+                root.on_event(&UiEvent::Drag { pos: input.mouse_pos, start }, rect, &ctx);
+            }
             if input.mouse_clicked {
                 root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
             }

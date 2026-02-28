@@ -66,6 +66,7 @@ impl InputState {
                 key,
                 state,
                 modifiers,
+                repeat,
                 ..
             } => {
                 self.modifiers = *modifiers;
@@ -73,7 +74,7 @@ impl InputState {
                 match state {
                     KeyState::Pressed => {
                         let inserted = self.keys_down.insert(*key);
-                        if inserted {
+                        if inserted || *repeat {
                             frame.keys_pressed.insert(*key);
                         }
                     }

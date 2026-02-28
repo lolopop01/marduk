@@ -13,27 +13,27 @@ use super::surface;
 /// - creates and configures the Surface (swapchain)
 /// - acquires frames and provides an encoder + view for rendering
 pub struct Gpu<'w> {
-    /// wgpu instance used to create the adapter and surface.
-    ///
-    /// Kept alive for the duration of `Gpu` because some wgpu backends require
-    /// the instance to outlive all objects created from it.
-    #[allow(dead_code)]
-    instance: wgpu::Instance,
-
-    /// Surface bound to the window.
-    surface: wgpu::Surface<'w>,
-
-    /// Logical device.
-    device: wgpu::Device,
-
-    /// Command queue.
-    queue: wgpu::Queue,
-
     /// Active surface configuration.
     config: wgpu::SurfaceConfiguration,
 
     /// Current drawable size in physical pixels.
     size: PhysicalSize<u32>,
+
+    /// Command queue.
+    queue: wgpu::Queue,
+
+    /// Logical device.
+    device: wgpu::Device,
+
+    /// Surface bound to the window.
+    surface: wgpu::Surface<'w>,
+
+    /// wgpu instance used to create the adapter and surface.
+    ///
+    /// Declared last so it is dropped last. Some wgpu backends (Vulkan) require
+    /// the instance to outlive all objects created from it (surface, device, queue).
+    #[allow(dead_code)]
+    instance: wgpu::Instance,
 }
 
 impl<'w> Gpu<'w> {

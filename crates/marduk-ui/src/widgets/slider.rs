@@ -119,14 +119,23 @@ impl Widget for Slider {
     }
 
     fn on_event(&mut self, event: &UiEvent, rect: Rect, _ctx: &LayoutCtx<'_>) -> EventResult {
-        if let UiEvent::Click { pos } = event {
-            if rect.contains(*pos) {
-                let t = ((pos.x - rect.origin.x) / rect.size.x).clamp(0.0, 1.0);
-                self.value = self.min + t * (self.max - self.min);
-                if let Some(f) = &mut self.on_change { f(self.value); }
-                return EventResult::Consumed;
+        let update = |value: &mut f32, on_change: &mut Option<Box<dyn FnMut(f32)>>, x: f32| {
+            let t = ((x - rect.origin.x) / rect.size.x).clamp(0.0, 1.0);
+            *value = self.min + t * (self.max - self.min);
+            if let Some(f) = on_change { f(*value); }
+        };
+        match event {
+            // Drag: follow the mouse as long as the drag started inside this slider.
+            UiEvent::Drag { pos, start } if rect.contains(*start) => {
+                update(&mut self.value, &mut self.on_change, pos.x);
+                EventResult::Consumed
             }
+            // Click (release): click-to-set anywhere on the track.
+            UiEvent::Click { pos } if rect.contains(*pos) => {
+                update(&mut self.value, &mut self.on_change, pos.x);
+                EventResult::Consumed
+            }
+            _ => EventResult::Ignored,
         }
-        EventResult::Ignored
     }
 }
