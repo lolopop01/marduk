@@ -1,6 +1,5 @@
 use winit::dpi::PhysicalSize;
-
-use super::{GpuInit, SurfaceErrorAction};
+use crate::device::SurfaceErrorAction;
 
 pub(crate) fn choose_surface_format(
     caps: &wgpu::SurfaceCapabilities,
