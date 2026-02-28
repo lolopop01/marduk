@@ -28,7 +28,7 @@ Column {
 
                 Button "LAUNCH SEQUENCE" {
                     font: body
-                    font_size: : 12
+                    font_size: 12
                     text_color: #b8ccdfff
                     bg: #0a1828ff
                     hover_bg: #102038ff
