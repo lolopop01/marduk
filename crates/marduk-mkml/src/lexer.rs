@@ -66,6 +66,18 @@ impl<'s> Lexer<'s> {
                 while !matches!(self.peek(), None | Some('\n')) {
                     self.advance();
                 }
+            // skip `/* */` block comments
+            } else if self.src[self.pos..].starts_with("/*") {
+                self.advance(); self.advance(); // consume `/*`
+                loop {
+                    if self.src[self.pos..].starts_with("*/") {
+                        self.advance(); self.advance(); // consume `*/`
+                        break;
+                    }
+                    if self.advance().is_none() {
+                        break; // unterminated — EOF will surface on next token
+                    }
+                }
             } else {
                 break;
             }

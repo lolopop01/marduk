@@ -8,15 +8,16 @@ import com.intellij.psi.tree.IElementType
  * Hand-written lexer for .mkml files.
  *
  * Token categories:
- *  - KEYWORD    → import | as
- *  - PROP_KEY   → identifier immediately followed (on the same line) by ':'
- *  - IDENTIFIER → widget names, event names, enum values
- *  - STRING     → "…"  (backslash escapes honoured)
- *  - COLOR      → #rrggbbaa  (# followed by hex digits)
- *  - NUMBER     → integer or float, optionally negative
- *  - COMMENT    → // … end-of-line
- *  - BRACE      → { }
- *  - COLON      → :
+ *  - KEYWORD     → import | as
+ *  - WIDGET_NAME → PascalCase identifier (not followed by ':')
+ *  - PROP_KEY    → identifier immediately followed (on the same line) by ':'
+ *  - IDENTIFIER  → event names, enum values, etc.
+ *  - STRING      → "…"  (backslash escapes honoured)
+ *  - COLOR       → #rrggbbaa  (# followed by hex digits)
+ *  - NUMBER      → integer or float, optionally negative
+ *  - COMMENT     → // … end-of-line  or  /* … */
+ *  - BRACE       → { }
+ *  - COLON       → :
  */
 class MardukLexer : LexerBase() {
 
@@ -66,6 +67,19 @@ class MardukLexer : LexerBase() {
             return MardukTokenTypes.COMMENT
         }
 
+        // Block comment  /* … */
+        if (c == '/' && pos + 1 < bufEnd && buffer[pos + 1] == '*') {
+            tokEnd = pos + 2
+            while (tokEnd < bufEnd) {
+                if (buffer[tokEnd] == '*' && tokEnd + 1 < bufEnd && buffer[tokEnd + 1] == '/') {
+                    tokEnd += 2
+                    break
+                }
+                tokEnd++
+            }
+            return MardukTokenTypes.COMMENT
+        }
+
         // String literal  "…"
         if (c == '"') {
             tokEnd = pos + 1
@@ -91,7 +105,7 @@ class MardukLexer : LexerBase() {
             return MardukTokenTypes.NUMBER
         }
 
-        // Identifier, keyword, or property key
+        // Identifier, keyword, widget name, or property key
         if (c.isLetter() || c == '_') {
             tokEnd = pos + 1
             while (tokEnd < bufEnd && (buffer[tokEnd].isLetterOrDigit() || buffer[tokEnd] == '_')) tokEnd++
@@ -99,6 +113,7 @@ class MardukLexer : LexerBase() {
             return when {
                 word == "import" || word == "as" -> MardukTokenTypes.KEYWORD
                 nextNonSpaceOnLine(tokEnd) == ':' -> MardukTokenTypes.PROP_KEY
+                c.isUpperCase() -> MardukTokenTypes.WIDGET_NAME   // PascalCase → widget/alias
                 else -> MardukTokenTypes.IDENTIFIER
             }
         }

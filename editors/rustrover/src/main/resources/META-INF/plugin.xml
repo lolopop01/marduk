@@ -46,6 +46,11 @@
             language="Marduk"
             implementationClass="com.marduk.lsp.MardukSyntaxHighlighter"/>
 
+        <!-- Native completions (widget names, property keys, common values). -->
+        <completion.contributor
+            language="Marduk"
+            implementationClass="com.marduk.lsp.MardukCompletionContributor"/>
+
         <!-- Hook into the built-in LSP client. -->
         <platform.lsp.serverSupportProvider
             implementation="com.marduk.lsp.MardukLspServerSupportProvider"/>

@@ -54,13 +54,11 @@ pub fn word_at<'t>(text: &'t str, pos: &Position) -> Option<&'t str> {
 /// Walk backwards through `before` (text up to the cursor) counting braces to
 /// find the nearest unclosed `{` block, then return the widget name that opened it.
 pub fn find_enclosing_widget(before: &str) -> Option<String> {
+    let stripped = strip_all_comments(before);
     let mut depth: i32 = 0;
 
-    for line in before.lines().rev() {
+    for line in stripped.lines().rev() {
         let trimmed = line.trim();
-        if trimmed.starts_with("//") {
-            continue;
-        }
         for ch in trimmed.chars().rev() {
             match ch {
                 '}' => depth += 1,
@@ -108,7 +106,7 @@ pub fn completion_context(text: &str, pos: &Position) -> Context {
     }
 
     let before = text_before(text, line_idx, col);
-    let depth = brace_depth(&before);
+    let depth = brace_depth(&strip_all_comments(&before));
 
     if depth == 0 {
         return Context::Widget;
@@ -126,8 +124,44 @@ pub fn completion_context(text: &str, pos: &Position) -> Context {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+/// Strip `//` from the current line only (used for single-line analysis).
 fn strip_comment(s: &str) -> &str {
     s.find("//").map(|i| &s[..i]).unwrap_or(s)
+}
+
+/// Strip both `//` and `/* */` comments from a multi-line text, replacing
+/// comment content with spaces so character offsets are approximately preserved.
+/// Newlines inside block comments are kept so line indices stay correct.
+fn strip_all_comments(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars.get(i) == Some(&'/') && chars.get(i + 1) == Some(&'/') {
+            // Line comment: blank until newline.
+            while i < chars.len() && chars[i] != '\n' {
+                out.push(' ');
+                i += 1;
+            }
+        } else if chars.get(i) == Some(&'/') && chars.get(i + 1) == Some(&'*') {
+            // Block comment: blank content, preserve newlines.
+            out.push_str("  ");
+            i += 2;
+            while i < chars.len() {
+                if chars.get(i) == Some(&'*') && chars.get(i + 1) == Some(&'/') {
+                    out.push_str("  ");
+                    i += 2;
+                    break;
+                }
+                out.push(if chars[i] == '\n' { '\n' } else { ' ' });
+                i += 1;
+            }
+        } else {
+            out.push(chars[i]);
+            i += 1;
+        }
+    }
+    out
 }
 
 fn brace_depth(text: &str) -> i32 {

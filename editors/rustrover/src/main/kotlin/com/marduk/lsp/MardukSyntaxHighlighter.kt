@@ -20,8 +20,9 @@ class MardukSyntaxHighlighter : SyntaxHighlighterBase() {
         val BRACE      = createTextAttributesKey("MKML_BRACE",      DefaultLanguageHighlighterColors.BRACES)
         val COLON      = createTextAttributesKey("MKML_COLON",      DefaultLanguageHighlighterColors.OPERATION_SIGN)
         // Property keys (e.g. `bg`, `gap`, `on_click`) styled like struct fields.
-        val PROP_KEY   = createTextAttributesKey("MKML_PROP_KEY",   DefaultLanguageHighlighterColors.INSTANCE_FIELD)
-        // Widget / event names use the default text colour (no key needed).
+        val PROP_KEY     = createTextAttributesKey("MKML_PROP_KEY",     DefaultLanguageHighlighterColors.INSTANCE_FIELD)
+        // Widget / import alias names (PascalCase) styled like class names.
+        val WIDGET_NAME  = createTextAttributesKey("MKML_WIDGET_NAME",  DefaultLanguageHighlighterColors.CLASS_NAME)
     }
 
     override fun getHighlightingLexer(): Lexer = MardukLexer()
@@ -35,7 +36,8 @@ class MardukSyntaxHighlighter : SyntaxHighlighterBase() {
             MardukTokenTypes.NUMBER   -> pack(NUMBER)
             MardukTokenTypes.BRACE    -> pack(BRACE)
             MardukTokenTypes.COLON    -> pack(COLON)
-            MardukTokenTypes.PROP_KEY -> pack(PROP_KEY)
+            MardukTokenTypes.PROP_KEY    -> pack(PROP_KEY)
+            MardukTokenTypes.WIDGET_NAME -> pack(WIDGET_NAME)
             else -> emptyArray()
         }
 }
