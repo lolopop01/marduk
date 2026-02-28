@@ -59,6 +59,11 @@ pub struct TextRenderer {
     // glyph cache
     glyph_cache: HashMap<GlyphRasterConfig, CachedGlyph>,
 
+    // The quantized physical scale factor at which cached glyphs were rasterized.
+    // When this changes the cache and atlas are invalidated so glyphs are re-rasterized
+    // at the new resolution (avoiding pixelation during zoom).
+    current_raster_scale: f32,
+
     // geometry
     quad_vbo: Option<wgpu::Buffer>,
     quad_ibo: Option<wgpu::Buffer>,
@@ -87,6 +92,7 @@ impl Default for TextRenderer {
             bind_group_generation: u64::MAX,
             atlas_full: false,
             glyph_cache: HashMap::new(),
+            current_raster_scale: 0.0, // 0.0 forces an update on the first frame
             quad_vbo: None,
             quad_ibo: None,
             instance_vbo: None,
@@ -114,6 +120,22 @@ impl TextRenderer {
         self.ensure_sampler(ctx);
         self.ensure_static_buffers(ctx);
 
+        // ── physical scale for crisp rasterization ─────────────────────────
+        // Quantise to 0.25 steps so the atlas doesn't accumulate dozens of
+        // slightly-different bitmaps during a smooth Ctrl+Scroll zoom gesture.
+        let raster_scale = (ctx.scale_factor * 4.0).round() / 4.0;
+        if (raster_scale - self.current_raster_scale).abs() > 0.001 {
+            // Scale changed — clear the glyph cache and reset the atlas cursor
+            // so glyphs are re-rasterized at the new physical resolution.
+            self.glyph_cache.clear();
+            self.atlas_cursor_x   = GLYPH_PADDING;
+            self.atlas_cursor_y   = GLYPH_PADDING;
+            self.atlas_row_height = 0;
+            self.atlas_full       = false;
+            self.atlas_generation += 1;
+            self.current_raster_scale = raster_scale;
+        }
+
         // ── collect text commands (with clip rects) ────────────────────────
         let text_cmds: Vec<_> = draw_list
             .iter_in_paint_order()
@@ -137,13 +159,16 @@ impl TextRenderer {
 
             let color = [cmd.color.r, cmd.color.g, cmd.color.b, cmd.color.a];
 
+            // Lay out at physical pixel size so fontdue rasterizes at full
+            // resolution.  Glyph positions come back in physical pixels and are
+            // divided by raster_scale below to recover logical coordinates.
             self.layout.reset(&LayoutSettings {
-                x: cmd.origin.x,
-                y: cmd.origin.y,
-                max_width: cmd.max_width,
+                x: cmd.origin.x * raster_scale,
+                y: cmd.origin.y * raster_scale,
+                max_width: cmd.max_width.map(|w| w * raster_scale),
                 ..LayoutSettings::default()
             });
-            self.layout.append(&[font], &TextStyle::new(&cmd.text, cmd.size, 0));
+            self.layout.append(&[font], &TextStyle::new(&cmd.text, cmd.size * raster_scale, 0));
 
             // Snapshot glyph positions into a plain Vec so that the borrow on
             // `self.layout` ends before we call `self.try_place_glyph` (which
@@ -175,10 +200,14 @@ impl TextRenderer {
 
                 let Some(cached) = self.glyph_cache.get(&key) else { continue };
 
+                // fontdue positions are in physical pixels; divide back to
+                // logical pixels so the vertex shader's NDC conversion works
+                // correctly with the zoomed viewport uniform.
+                let rs = raster_scale;
                 instances.push((
                     GlyphInstance {
-                        dst_min: [x, y],
-                        dst_max: [x + w as f32, y + h as f32],
+                        dst_min: [x / rs,              y / rs],
+                        dst_max: [(x + w as f32) / rs, (y + h as f32) / rs],
                         uv_min:  cached.uv_min,
                         uv_max:  cached.uv_max,
                         color,
