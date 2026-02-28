@@ -14,15 +14,13 @@ fn main() {
 
     Application::new()
         .title("Redline Logistics — Depot YUL-WEST")
-        .size(960.0, 660.0)
+        .size(620.0, 500.0)
         .zoom(1.0)   // Ctrl+Scroll to adjust at runtime
         .font("body", load_font())
         // ── components ────────────────────────────────────────────────────
-        .component("Header",    include_str!("../ui/header.mkml"))
-        .component("Fleet",     include_str!("../ui/components/fleet.mkml"))
-        .component("Warehouse", include_str!("../ui/components/warehouse.mkml"))
-        .component("Dispatch",  include_str!("../ui/components/dispatch.mkml"))
-        .component("Settings",  include_str!("../ui/components/settings.mkml"))
+        .component("Header",   include_str!("../ui/header.mkml"))
+        .component("Fleet",    include_str!("../ui/components/fleet.mkml"))
+        .component("Dispatch", include_str!("../ui/components/dispatch.mkml"))
         // ── scroll ────────────────────────────────────────────────────────
         .on_event("main_scroll", || {})
         // ── dispatch ──────────────────────────────────────────────────────
@@ -30,7 +28,6 @@ fn main() {
         .on_event("send_dispatch_note", || {
             println!();
             println!("  [DISPATCH] Note queued for transmission.");
-            println!("  Encoding ... AES-128");
             println!("  Status   ... SENT to active drivers");
             println!();
         })
@@ -38,21 +35,13 @@ fn main() {
             state.clear("dispatch_note");
             println!("  [DISPATCH] Note cleared.");
         })
-        // ── thresholds (sliders) ──────────────────────────────────────────
-        .on_event("fuel_threshold_changed",  || println!("  [CFG] Fuel warning threshold updated."))
-        .on_event("cap_threshold_changed",   || println!("  [CFG] Capacity warning threshold updated."))
-        .on_event("overdue_buffer_changed",  || println!("  [CFG] Overdue ETA buffer updated."))
+        // ── slider ────────────────────────────────────────────────────────
+        .on_event("fuel_threshold_changed", || println!("  [CFG] Fuel warning threshold updated."))
         // ── toggles ───────────────────────────────────────────────────────
-        .on_event("gps_toggled",             || println!("  [SYS] GPS tracking toggled."))
-        .on_event("auto_dispatch_toggled",   || println!("  [SYS] Auto-dispatch toggled."))
-        .on_event("sms_toggled",             || println!("  [SYS] SMS alerts toggled."))
-        .on_event("night_logging_toggled",   || println!("  [SYS] Night shift logging toggled."))
-        // ── checkboxes ────────────────────────────────────────────────────
-        .on_event("load_photo_toggled",      || println!("  [CFG] Require load photo toggled."))
-        .on_event("idle_log_toggled",        || println!("  [CFG] Idle time logging toggled."))
-        .on_event("maint_remind_toggled",    || println!("  [CFG] Maintenance reminders toggled."))
-        // ── shift schedule (radio) ────────────────────────────────────────
-        .on_event("shift_mode_changed",      || println!("  [CFG] Shift schedule updated."))
+        .on_event("gps_toggled",            || println!("  [SYS] GPS tracking toggled."))
+        .on_event("sms_toggled",            || println!("  [SYS] SMS alerts toggled."))
+        // ── checkbox ──────────────────────────────────────────────────────
+        .on_event("load_photo_toggled",     || println!("  [CFG] Load photo requirement toggled."))
         .run(include_str!("../ui/main.mkml"))
 }
 

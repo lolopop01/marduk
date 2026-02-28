@@ -1,12 +1,12 @@
-// Active orders & dispatch queue
+// Dispatch note + system controls
 Column {
     padding_left: 20
     padding_right: 20
     padding_top: 4
-    padding_bottom: 4
-    gap: 8
+    padding_bottom: 28
+    gap: 10
 
-    Text "// DISPATCH QUEUE  —  5 active  /  2 overdue" {
+    Text "// DISPATCH" {
         font: body
         size: 10
         color: #4a4030ff
@@ -20,254 +20,151 @@ Column {
         padding: 14
 
         Column {
-            gap: 6
+            gap: 10
 
-            // #4468 — on site unloading
-            Container {
-                bg: #0e1e0aff
-                border_width: 1
-                border_color: #1c3a12ff
-                corner_radius: 2
-                padding: 10
-
-                Row {
-                    align: center
-                    gap: 0
-
-                    Column {
-                        gap: 3
-
-                        Text "#4468  —  Montreal Metro Supply" {
-                            font: body
-                            size: 12
-                            color: #d4c49aff
-                        }
-
-                        Text "31 pallets  ·  perishable  ·  Dock C  ·  due 16:30" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-                    }
-
-                    Container { }
-
-                    Text "ON SITE" {
-                        font: body
-                        size: 11
-                        color: #4a9a30ff
-                    }
-                }
-            }
-
-            // #4469 — OVERDUE, truck broke down
-            Container {
-                bg: #1a1210ff
-                border_width: 1
-                border_color: #3a2010ff
-                corner_radius: 2
-                padding: 10
-
-                Row {
-                    align: center
-                    gap: 0
-
-                    Column {
-                        gap: 3
-
-                        Text "#4469  —  Brossard Home Depot" {
-                            font: body
-                            size: 12
-                            color: #d4c49aff
-                        }
-
-                        Text "22 pallets  ·  hardware  ·  TRK-003 broken down  ·  was due 16:00" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-                    }
-
-                    Container { }
-
-                    Text "OVERDUE" {
-                        font: body
-                        size: 11
-                        color: #b83020ff
-                    }
-                }
-            }
-
-            // #4470 — OVERDUE, no driver
-            Container {
-                bg: #1a1210ff
-                border_width: 1
-                border_color: #3a2010ff
-                corner_radius: 2
-                padding: 10
-
-                Row {
-                    align: center
-                    gap: 0
-
-                    Column {
-                        gap: 3
-
-                        Text "#4470  —  Laval Costco" {
-                            font: body
-                            size: 12
-                            color: #d4c49aff
-                        }
-
-                        Text "54 pallets  ·  dry goods  ·  no driver assigned  ·  was due 15:30" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-                    }
-
-                    Container { }
-
-                    Text "OVERDUE" {
-                        font: body
-                        size: 11
-                        color: #b83020ff
-                    }
-                }
-            }
-
-            // #4471 — on route, normal
-            Container {
-                bg: #161512ff
-                border_width: 1
+            TextBox {
+                font: body
+                font_size: 12
+                state_key: dispatch_note
+                placeholder: "Driver note or instruction..."
+                bg: #0e0d0bff
+                focused_bg: #141210ff
                 border_color: #272420ff
-                corner_radius: 2
-                padding: 10
-
-                Row {
-                    align: center
-                    gap: 0
-
-                    Column {
-                        gap: 3
-
-                        Text "#4471  —  IGA Distribution  Sherbrooke" {
-                            font: body
-                            size: 12
-                            color: #d4c49aff
-                        }
-
-                        Text "47 pallets  ·  food  ·  TRK-001  ·  due 18:30" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-                    }
-
-                    Container { }
-
-                    Text "ON ROUTE" {
-                        font: body
-                        size: 11
-                        color: #4a9a30ff
-                    }
-                }
+                accent: #c8780aff
+                corner_radius: 3
+                padding: 8
+                on_change: dispatch_note_changed
+                on_submit: send_dispatch_note
             }
 
-            // #4473 — high priority, low fuel risk
-            Container {
-                bg: #181510ff
-                border_width: 1
-                border_color: #382c1aff
-                corner_radius: 2
-                padding: 10
+            Row {
+                gap: 8
+                align: start
 
-                Row {
-                    align: center
-                    gap: 0
+                Button "SEND" {
+                    font: body
+                    font_size: 12
+                    text_color: #c8780aff
+                    bg: #1e1800ff
+                    hover_bg: #2a2210ff
+                    press_bg: #362c18ff
+                    border_width: 1
+                    border_color: #c8780a44
+                    corner_radius: 3
+                    padding_top: 7
+                    padding_bottom: 7
+                    padding_left: 16
+                    padding_right: 16
+                    on_click: send_dispatch_note
+                }
 
-                    Column {
-                        gap: 3
-
-                        Text "#4473  —  St-Hubert Food Service  Laval  [HIGH]" {
-                            font: body
-                            size: 12
-                            color: #d4c49aff
-                        }
-
-                        Text "19 pallets  ·  frozen  ·  TRK-004 low fuel  ·  due 17:00" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-                    }
-
-                    Container { }
-
-                    Text "ON ROUTE" {
-                        font: body
-                        size: 11
-                        color: #c8780aff
-                    }
+                Button "CLEAR" {
+                    font: body
+                    font_size: 12
+                    text_color: #4a4030ff
+                    bg: #161512ff
+                    hover_bg: #201e18ff
+                    press_bg: #2a2820ff
+                    border_width: 1
+                    border_color: #272420ff
+                    corner_radius: 3
+                    padding_top: 7
+                    padding_bottom: 7
+                    padding_left: 16
+                    padding_right: 16
+                    on_click: clear_dispatch_note
                 }
             }
+        }
+    }
 
-            // Dispatch note
+    Text "// SETTINGS" {
+        font: body
+        size: 10
+        color: #4a4030ff
+    }
+
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 14
+
             Column {
                 gap: 6
 
-                TextBox {
+                Text "Fuel warning level" {
                     font: body
-                    font_size: 12
-                    state_key: dispatch_note
-                    placeholder: "Dispatch note or driver instruction..."
-                    bg: #0e0d0bff
-                    focused_bg: #141210ff
-                    border_color: #272420ff
+                    size: 10
+                    color: #6a5e40ff
+                }
+
+                Slider {
+                    font: body
+                    state_key: fuel_warn_pct
+                    min: 10
+                    max: 50
+                    value: 25
                     accent: #c8780aff
-                    corner_radius: 3
-                    padding: 8
-                    on_change: dispatch_note_changed
-                    on_submit: send_dispatch_note
+                    track_color: #0e0d0bff
+                    on_change: fuel_threshold_changed
+                }
+            }
+
+            Row {
+                gap: 28
+                align: center
+
+                Row {
+                    gap: 10
+                    align: center
+
+                    Toggle {
+                        state_key: gps_tracking
+                        checked: true
+                        on_color: #4a9a30ff
+                        off_color: #1e1c16ff
+                        on_change: gps_toggled
+                    }
+
+                    Text "GPS" {
+                        font: body
+                        size: 12
+                        color: #d4c49aff
+                    }
                 }
 
                 Row {
-                    gap: 8
-                    align: start
+                    gap: 10
+                    align: center
 
-                    Button "SEND NOTE" {
-                        font: body
-                        font_size: 12
-                        text_color: #c8780aff
-                        bg: #1e1800ff
-                        hover_bg: #2a2210ff
-                        press_bg: #362c18ff
-                        border_width: 1
-                        border_color: #c8780a44
-                        corner_radius: 3
-                        padding_top: 7
-                        padding_bottom: 7
-                        padding_left: 14
-                        padding_right: 14
-                        on_click: send_dispatch_note
+                    Toggle {
+                        state_key: sms_alerts
+                        checked: true
+                        on_color: #4a9a30ff
+                        off_color: #1e1c16ff
+                        on_change: sms_toggled
                     }
 
-                    Button "CLEAR" {
+                    Text "SMS" {
                         font: body
-                        font_size: 12
-                        text_color: #4a4030ff
-                        bg: #161512ff
-                        hover_bg: #201e18ff
-                        press_bg: #2a2820ff
-                        border_width: 1
-                        border_color: #272420ff
-                        corner_radius: 3
-                        padding_top: 7
-                        padding_bottom: 7
-                        padding_left: 14
-                        padding_right: 14
-                        on_click: clear_dispatch_note
+                        size: 12
+                        color: #d4c49aff
                     }
+                }
+
+                Checkbox "Load photo" {
+                    font: body
+                    font_size: 12
+                    state_key: load_photo
+                    checked: true
+                    checked_color: #4a9a30ff
+                    border_color: #3a3020ff
+                    on_change: load_photo_toggled
                 }
             }
         }

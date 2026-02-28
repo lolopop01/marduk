@@ -1,18 +1,17 @@
-// Fleet status — 4 trucks in rotation
+// Fleet — single active unit
 Column {
     padding_left: 20
     padding_right: 20
     padding_top: 16
     padding_bottom: 4
-    gap: 8
+    gap: 10
 
-    Text "// FLEET STATUS  —  4 UNITS" {
+    Text "// FLEET" {
         font: body
         size: 10
         color: #4a4030ff
     }
 
-    // TRK-001  ON ROUTE  OK
     Container {
         bg: #161512ff
         border_width: 1
@@ -21,9 +20,8 @@ Column {
         padding: 14
 
         Column {
-            gap: 10
+            gap: 12
 
-            // Status header row
             Row {
                 align: center
                 gap: 10
@@ -49,12 +47,6 @@ Column {
                     color: #d4c49aff
                 }
 
-                Text "Peterbilt 389  (Big Red)" {
-                    font: body
-                    size: 11
-                    color: #6a5e40ff
-                }
-
                 Container { }
 
                 Text "ETA 1h 47m  ·  Sherbrooke" {
@@ -64,417 +56,65 @@ Column {
                 }
             }
 
-            Row {
-                gap: 32
-                align: start
+            Column {
+                gap: 4
 
-                Column {
-                    gap: 4
+                Row {
+                    align: center
+                    gap: 0
 
-                    Row {
-                        align: center
-                        gap: 0
-
-                        Text "FUEL" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-
-                        Container { }
-
-                        Text "67%" {
-                            font: body
-                            size: 10
-                            color: #d4c49aff
-                        }
-                    }
-
-                    ProgressBar {
-                        value: 0.67
-                        height: 5
-                        accent: #4a9a30ff
-                        track_color: #0e0d0bff
-                        corner_radius: 2
-                    }
-                }
-
-                Column {
-                    gap: 4
-
-                    Row {
-                        align: center
-                        gap: 0
-
-                        Text "LOAD" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-
-                        Container { }
-
-                        Text "18,400 / 22,000 kg" {
-                            font: body
-                            size: 10
-                            color: #d4c49aff
-                        }
-                    }
-
-                    ProgressBar {
-                        value: 0.84
-                        height: 5
-                        accent: #4a9a30ff
-                        track_color: #0e0d0bff
-                        corner_radius: 2
-                    }
-                }
-
-                Column {
-                    gap: 3
-
-                    Text "Driver: M. Tremblay" {
+                    Text "FUEL" {
                         font: body
                         size: 10
                         color: #6a5e40ff
                     }
 
-                    Text "Order #4471  ·  priority: NORMAL" {
+                    Container { }
+
+                    Text "67%" {
                         font: body
                         size: 10
-                        color: #4a4030ff
+                        color: #d4c49aff
                     }
                 }
-            }
-        }
-    }
 
-    // TRK-002  AT DOCK
-    Container {
-        bg: #161512ff
-        border_width: 1
-        border_color: #272420ff
-        corner_radius: 3
-        padding: 14
-
-        Column {
-            gap: 10
-
-            Row {
-                align: center
-                gap: 10
-
-                Container {
-                    bg: #0a1424ff
+                ProgressBar {
+                    value: 0.67
+                    height: 5
+                    accent: #4a9a30ff
+                    track_color: #0e0d0bff
                     corner_radius: 2
-                    padding_top: 3
-                    padding_bottom: 3
-                    padding_left: 8
-                    padding_right: 8
-
-                    Text "AT DOCK" {
-                        font: body
-                        size: 10
-                        color: #3a7ab0ff
-                    }
-                }
-
-                Text "TRK-002" {
-                    font: body
-                    size: 12
-                    color: #d4c49aff
-                }
-
-                Text "Kenworth T680  (Old Faithful)" {
-                    font: body
-                    size: 11
-                    color: #6a5e40ff
-                }
-
-                Container { }
-
-                Text "Idle since 14:30  ·  Dock B" {
-                    font: body
-                    size: 11
-                    color: #6a5e40ff
                 }
             }
 
-            Row {
-                gap: 32
-                align: start
+            Column {
+                gap: 4
 
-                Column {
-                    gap: 4
+                Row {
+                    align: center
+                    gap: 0
 
-                    Row {
-                        align: center
-                        gap: 0
-
-                        Text "FUEL" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-
-                        Container { }
-
-                        Text "91%" {
-                            font: body
-                            size: 10
-                            color: #d4c49aff
-                        }
-                    }
-
-                    ProgressBar {
-                        value: 0.91
-                        height: 5
-                        accent: #4a9a30ff
-                        track_color: #0e0d0bff
-                        corner_radius: 2
-                    }
-                }
-
-                Column {
-                    gap: 3
-
-                    Text "Driver: J. Bouchard" {
+                    Text "LOAD" {
                         font: body
                         size: 10
                         color: #6a5e40ff
                     }
 
-                    Text "Awaiting load assignment" {
+                    Container { }
+
+                    Text "18,400 / 22,000 kg" {
                         font: body
                         size: 10
-                        color: #4a4030ff
+                        color: #d4c49aff
                     }
                 }
-            }
-        }
-    }
 
-    // TRK-003  BREAKDOWN  CRITICAL
-    Container {
-        bg: #1a1210ff
-        border_width: 1
-        border_color: #3a2010ff
-        corner_radius: 3
-        padding: 14
-
-        Column {
-            gap: 10
-
-            Row {
-                align: center
-                gap: 10
-
-                Container {
-                    bg: #3a1000ff
+                ProgressBar {
+                    value: 0.84
+                    height: 5
+                    accent: #4a9a30ff
+                    track_color: #0e0d0bff
                     corner_radius: 2
-                    padding_top: 3
-                    padding_bottom: 3
-                    padding_left: 8
-                    padding_right: 8
-
-                    Text "BREAKDOWN" {
-                        font: body
-                        size: 10
-                        color: #b83020ff
-                    }
-                }
-
-                Text "TRK-003" {
-                    font: body
-                    size: 12
-                    color: #d4c49aff
-                }
-
-                Text "Freightliner Cascadia  (Nighthawk)" {
-                    font: body
-                    size: 11
-                    color: #6a5e40ff
-                }
-
-                Container { }
-
-                Text "Hwy 40 MM 187  ·  mechanic en route" {
-                    font: body
-                    size: 11
-                    color: #c8780aff
-                }
-            }
-
-            Row {
-                gap: 32
-                align: start
-
-                Column {
-                    gap: 3
-
-                    Text "Fault: coolant temp 118°C — engine shutdown" {
-                        font: body
-                        size: 10
-                        color: #b83020ff
-                    }
-
-                    Text "Last checkpoint 13:52  ·  load remains on board" {
-                        font: body
-                        size: 10
-                        color: #6a5e40ff
-                    }
-                }
-
-                Column {
-                    gap: 3
-
-                    Text "Driver: R. Cote" {
-                        font: body
-                        size: 10
-                        color: #6a5e40ff
-                    }
-
-                    Text "Order #4469  ·  delivery DELAYED" {
-                        font: body
-                        size: 10
-                        color: #c8780aff
-                    }
-                }
-            }
-        }
-    }
-
-    // TRK-004  LOW FUEL  WARNING
-    Container {
-        bg: #181510ff
-        border_width: 1
-        border_color: #382c1aff
-        corner_radius: 3
-        padding: 14
-
-        Column {
-            gap: 10
-
-            Row {
-                align: center
-                gap: 10
-
-                Container {
-                    bg: #2e1e00ff
-                    corner_radius: 2
-                    padding_top: 3
-                    padding_bottom: 3
-                    padding_left: 8
-                    padding_right: 8
-
-                    Text "LOW FUEL" {
-                        font: body
-                        size: 10
-                        color: #c8780aff
-                    }
-                }
-
-                Text "TRK-004" {
-                    font: body
-                    size: 12
-                    color: #d4c49aff
-                }
-
-                Text "Volvo VNL  (Blue Devil)" {
-                    font: body
-                    size: 11
-                    color: #6a5e40ff
-                }
-
-                Container { }
-
-                Text "ETA 3h 12m  ·  Laval,  QC" {
-                    font: body
-                    size: 11
-                    color: #6a5e40ff
-                }
-            }
-
-            Row {
-                gap: 32
-                align: start
-
-                Column {
-                    gap: 4
-
-                    Row {
-                        align: center
-                        gap: 0
-
-                        Text "FUEL" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-
-                        Container { }
-
-                        Text "23%  (!)" {
-                            font: body
-                            size: 10
-                            color: #c8780aff
-                        }
-                    }
-
-                    ProgressBar {
-                        value: 0.23
-                        height: 5
-                        accent: #c8780aff
-                        track_color: #0e0d0bff
-                        corner_radius: 2
-                    }
-                }
-
-                Column {
-                    gap: 4
-
-                    Row {
-                        align: center
-                        gap: 0
-
-                        Text "LOAD" {
-                            font: body
-                            size: 10
-                            color: #6a5e40ff
-                        }
-
-                        Container { }
-
-                        Text "9,100 / 22,000 kg" {
-                            font: body
-                            size: 10
-                            color: #d4c49aff
-                        }
-                    }
-
-                    ProgressBar {
-                        value: 0.41
-                        height: 5
-                        accent: #4a9a30ff
-                        track_color: #0e0d0bff
-                        corner_radius: 2
-                    }
-                }
-
-                Column {
-                    gap: 3
-
-                    Text "Driver: F. Gagnon" {
-                        font: body
-                        size: 10
-                        color: #6a5e40ff
-                    }
-
-                    Text "Order #4473  ·  priority: HIGH" {
-                        font: body
-                        size: 10
-                        color: #c8780aff
-                    }
                 }
             }
         }

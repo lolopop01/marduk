@@ -160,12 +160,13 @@ impl TextRenderer {
             let color = [cmd.color.r, cmd.color.g, cmd.color.b, cmd.color.a];
 
             // Lay out at physical pixel size so fontdue rasterizes at full
-            // resolution.  Glyph positions come back in physical pixels and are
-            // divided by raster_scale below to recover logical coordinates.
+            // resolution.  Round the origin to the nearest integer physical
+            // pixel so glyph quad edges always land on exact pixel boundaries —
+            // avoids sub-pixel fringe when divided back to logical coordinates.
             self.layout.reset(&LayoutSettings {
-                x: cmd.origin.x * raster_scale,
-                y: cmd.origin.y * raster_scale,
-                max_width: cmd.max_width.map(|w| w * raster_scale),
+                x: (cmd.origin.x * raster_scale).round(),
+                y: (cmd.origin.y * raster_scale).round(),
+                max_width: cmd.max_width.map(|w| (w * raster_scale).round()),
                 ..LayoutSettings::default()
             });
             self.layout.append(&[font], &TextStyle::new(&cmd.text, cmd.size * raster_scale, 0));
@@ -200,14 +201,15 @@ impl TextRenderer {
 
                 let Some(cached) = self.glyph_cache.get(&key) else { continue };
 
-                // fontdue positions are in physical pixels; divide back to
-                // logical pixels so the vertex shader's NDC conversion works
-                // correctly with the zoomed viewport uniform.
+                // Round to integer physical pixels first, then divide to
+                // logical.  This ensures each quad edge aligns to an exact
+                // screen pixel, preventing the nearest-neighbour sampler from
+                // straddling a texel boundary and producing a 1px fringe.
                 let rs = raster_scale;
                 instances.push((
                     GlyphInstance {
-                        dst_min: [x / rs,              y / rs],
-                        dst_max: [(x + w as f32) / rs, (y + h as f32) / rs],
+                        dst_min: [x.round() / rs,              y.round() / rs],
+                        dst_max: [(x + w as f32).round() / rs, (y + h as f32).round() / rs],
                         uv_min:  cached.uv_min,
                         uv_max:  cached.uv_max,
                         color,
@@ -463,14 +465,18 @@ impl TextRenderer {
         if self.sampler.is_some() {
             return;
         }
+        // Nearest-neighbour: we rasterize glyphs at the exact physical-pixel
+        // resolution, so each atlas texel maps 1:1 to a screen pixel.  Linear
+        // sampling would interpolate with the 1-pixel padding between glyphs,
+        // producing a faint fringe/outline around every glyph.
         self.sampler = Some(ctx.device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("marduk text sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Nearest, // fix: MipmapFilterMode
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         }));
     }

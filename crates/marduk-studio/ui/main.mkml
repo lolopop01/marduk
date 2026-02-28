@@ -1,9 +1,6 @@
-// Redline Logistics — root layout
-import "header.mkml"                  as Header
-import "components/fleet.mkml"        as Fleet
-import "components/warehouse.mkml"    as Warehouse
-import "components/dispatch.mkml"     as Dispatch
-import "components/settings.mkml"     as Settings
+import "header.mkml"              as Header
+import "components/fleet.mkml"    as Fleet
+import "components/dispatch.mkml" as Dispatch
 
 Stack {
     bg: #0e0d0bff
@@ -12,11 +9,11 @@ Stack {
         top: 0
         left: 0
         right: 0
-        height: 48
+        height: 46
     }
 
     ScrollView {
-        top: 48
+        top: 46
         left: 0
         right: 0
         bottom: 0
@@ -25,10 +22,33 @@ Stack {
         Column {
             gap: 0
 
+            // ── Live feed placeholder ──────────────────────────────────────
+            Container {
+                padding_left: 20
+                padding_right: 20
+                padding_top: 16
+                padding_bottom: 16
+
+                Container {
+                    bg: #0c0b09ff
+                    border_width: 1
+                    border_color: #1c1a13ff
+                    corner_radius: 3
+                    padding_top: 54
+                    padding_bottom: 54
+                    padding_left: 20
+                    padding_right: 20
+
+                    Text "[ LIVECAM  —  TRK-001  —  NO SIGNAL ]" {
+                        font: body
+                        size: 10
+                        color: #232018ff
+                    }
+                }
+            }
+
             Fleet { }
-            Warehouse { }
             Dispatch { }
-            Settings { }
         }
     }
 }
