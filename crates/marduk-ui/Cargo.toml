@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 marduk-engine = { path = "../marduk-engine" }
+marduk-mkml   = { path = "../marduk-mkml" }
 # winit is used internally in app.rs to construct RuntimeConfig.
 # Not exposed in the public API — user code never imports winit.
 winit = "0.30.12"

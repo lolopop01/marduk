@@ -1,5 +1,3 @@
-use marduk_engine::paint::Color;
-
 // ── Value ─────────────────────────────────────────────────────────────────
 
 /// A literal value in a property.
@@ -9,8 +7,12 @@ pub enum Value {
     Str(String),
     /// Floating-point literal: `16.0` or `16`
     Number(f32),
-    /// Color literal: `#rrggbbaa` (8 hex digits, straight alpha)
-    Color(Color),
+    /// Color literal: `#rrggbbaa` (8 hex digits).
+    ///
+    /// Stored as `[r, g, b, a]` bytes in **straight alpha**, exactly as written
+    /// in the source. Callers that need a specific color space (e.g. premultiplied
+    /// linear) are responsible for converting.
+    Color([u8; 4]),
     /// Unquoted identifier: used for font names, event names, enum variants
     Ident(String),
 }
@@ -68,8 +70,8 @@ impl Node {
         }
     }
 
-    /// Get a property as `Color` if it is a `Color`.
-    pub fn prop_color(&self, key: &str) -> Option<Color> {
+    /// Get a property as `[r, g, b, a]` straight-alpha bytes if it is a `Color`.
+    pub fn prop_color(&self, key: &str) -> Option<[u8; 4]> {
         match self.prop(key)? {
             Value::Color(c) => Some(*c),
             _ => None,

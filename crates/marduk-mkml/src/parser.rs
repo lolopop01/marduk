@@ -1,6 +1,6 @@
-use crate::dsl::ast::{DslDocument, Import, Node, Prop, Value};
-use crate::dsl::error::ParseError;
-use crate::dsl::lexer::{Lexer, Token};
+use crate::ast::{DslDocument, Import, Node, Prop, Value};
+use crate::error::ParseError;
+use crate::lexer::{Lexer, Token};
 
 // ── Parser ────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,4 @@
-use marduk_engine::paint::Color;
-
-use crate::dsl::error::ParseError;
+use crate::error::ParseError;
 
 // ── Token ─────────────────────────────────────────────────────────────────
 
@@ -10,7 +8,8 @@ pub enum Token {
     Ident(String),
     Str(String),
     Number(f32),
-    Color(Color),
+    /// Color literal: `[r, g, b, a]` straight-alpha bytes as parsed from `#rrggbbaa`.
+    Color([u8; 4]),
     // Punctuation
     Colon,
     LBrace,
@@ -141,13 +140,7 @@ impl<'s> Lexer<'s> {
         } else {
             255
         };
-        let color = Color::from_straight(
-            r as f32 / 255.0,
-            g as f32 / 255.0,
-            b as f32 / 255.0,
-            a as f32 / 255.0,
-        );
-        Ok(Token::Color(color))
+        Ok(Token::Color([r, g, b, a]))
     }
 
     fn lex_number(&mut self) -> Result<Token, ParseError> {

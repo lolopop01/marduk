@@ -10,6 +10,26 @@ use crate::constraints::Edges;
 use crate::dsl::ast::{DslDocument, Node, Value};
 use crate::dsl::error::ParseError;
 use crate::dsl::parser::parse_str;
+
+// ── Color conversion ──────────────────────────────────────────────────────
+
+/// Extension on [`Node`] that converts `[u8; 4]` straight-alpha color bytes
+/// (from the parser) into the engine's premultiplied linear `Color`.
+trait NodeExt {
+    fn engine_color(&self, key: &str) -> Option<Color>;
+}
+
+impl NodeExt for Node {
+    fn engine_color(&self, key: &str) -> Option<Color> {
+        let [r, g, b, a] = self.prop_color(key)?;
+        Some(Color::from_straight(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        ))
+    }
+}
 use crate::widget::Element;
 use crate::widgets::{
     button::Button,
@@ -170,7 +190,7 @@ impl DslLoader {
         };
         let text  = node.content.clone().unwrap_or_default();
         let size  = node.prop_f32("size").unwrap_or(14.0);
-        let color = node.prop_color("color")
+        let color = node.engine_color("color")
             .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 1.0));
         Text::new(text, font, size, color).into()
     }
@@ -185,7 +205,7 @@ impl DslLoader {
         if let Some(edges) = self.parse_edges(node) {
             c = c.padding(edges);
         }
-        if let Some(col) = node.prop_color("bg") {
+        if let Some(col) = node.engine_color("bg") {
             c = c.background(Paint::Solid(col));
         }
         if let Some(r) = node.prop_f32("corner_radius") {
@@ -258,7 +278,7 @@ impl DslLoader {
         } else if let Some(font) = self.resolve_font(node, bindings) {
             let label = node.content.clone().unwrap_or_default();
             let size  = node.prop_f32("font_size").unwrap_or(14.0);
-            let color = node.prop_color("text_color")
+            let color = node.engine_color("text_color")
                 .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 1.0));
             Text::new(label, font, size, color).into()
         } else {
@@ -267,13 +287,13 @@ impl DslLoader {
 
         let mut btn = Button::new(inner);
 
-        if let Some(col) = node.prop_color("bg") {
+        if let Some(col) = node.engine_color("bg") {
             btn = btn.background(col);
         }
-        if let Some(col) = node.prop_color("hover_bg") {
+        if let Some(col) = node.engine_color("hover_bg") {
             btn = btn.hover_background(col);
         }
-        if let Some(col) = node.prop_color("press_bg") {
+        if let Some(col) = node.engine_color("press_bg") {
             btn = btn.press_background(col);
         }
         if let Some(r) = node.prop_f32("corner_radius") {
@@ -286,7 +306,7 @@ impl DslLoader {
             btn = btn.padding(edges);
         }
         if let Some(bw) = node.prop_f32("border_width") {
-            let bc = node.prop_color("border_color")
+            let bc = node.engine_color("border_color")
                 .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 0.3));
             btn = btn.border(Border::new(bw, bc));
         }
@@ -320,14 +340,14 @@ impl DslLoader {
 
         if let Some(font) = self.resolve_font(node, bindings) { cb = cb.font(font); }
         if let Some(v) = node.prop_f32("font_size") { cb = cb.font_size(v); }
-        if let Some(v) = node.prop_color("label_color").or_else(|| node.prop_color("color")) {
+        if let Some(v) = node.engine_color("label_color").or_else(|| node.engine_color("color")) {
             cb = cb.label_color(v);
         }
         if let Some(v) = node.prop_f32("box_size") { cb = cb.box_size(v); }
-        if let Some(v) = node.prop_color("checked_color").or_else(|| node.prop_color("accent")) {
+        if let Some(v) = node.engine_color("checked_color").or_else(|| node.engine_color("accent")) {
             cb = cb.checked_color(v);
         }
-        if let Some(v) = node.prop_color("border_color") { cb = cb.border_color(v); }
+        if let Some(v) = node.engine_color("border_color") { cb = cb.border_color(v); }
         if let Some(v) = node.prop_f32("corner_radius") { cb = cb.corner_radius(v); }
 
         let label = node.content.clone()
@@ -370,9 +390,9 @@ impl DslLoader {
 
         if let Some(v) = node.prop_f32("width")  { tg = tg.width(v); }
         if let Some(v) = node.prop_f32("height") { tg = tg.height(v); }
-        if let Some(v) = node.prop_color("on_color")    { tg = tg.on_color(v); }
-        if let Some(v) = node.prop_color("off_color")   { tg = tg.off_color(v); }
-        if let Some(v) = node.prop_color("thumb_color") { tg = tg.thumb_color(v); }
+        if let Some(v) = node.engine_color("on_color")    { tg = tg.on_color(v); }
+        if let Some(v) = node.engine_color("off_color")   { tg = tg.off_color(v); }
+        if let Some(v) = node.engine_color("thumb_color") { tg = tg.thumb_color(v); }
 
         if let Some(event_name) = node.prop_str("on_change") {
             let queue = Rc::clone(&bindings.event_queue);
@@ -412,11 +432,11 @@ impl DslLoader {
 
         if let Some(v) = node.prop_f32("track_height")  { sl = sl.track_height(v); }
         if let Some(v) = node.prop_f32("thumb_radius")  { sl = sl.thumb_radius(v); }
-        if let Some(v) = node.prop_color("track_color") { sl = sl.track_color(v); }
-        if let Some(v) = node.prop_color("fill_color").or_else(|| node.prop_color("accent")) {
+        if let Some(v) = node.engine_color("track_color") { sl = sl.track_color(v); }
+        if let Some(v) = node.engine_color("fill_color").or_else(|| node.engine_color("accent")) {
             sl = sl.fill_color(v);
         }
-        if let Some(v) = node.prop_color("thumb_color") { sl = sl.thumb_color(v); }
+        if let Some(v) = node.engine_color("thumb_color") { sl = sl.thumb_color(v); }
         if let Some(v) = node.prop_f32("corner_radius") { sl = sl.corner_radius(v); }
 
         if let Some(event_name) = node.prop_str("on_change") {
@@ -457,11 +477,11 @@ impl DslLoader {
 
         if let Some(font) = self.resolve_font(node, bindings) { rg = rg.font(font); }
         if let Some(v) = node.prop_f32("font_size")            { rg = rg.font_size(v); }
-        if let Some(v) = node.prop_color("label_color").or_else(|| node.prop_color("color")) {
+        if let Some(v) = node.engine_color("label_color").or_else(|| node.engine_color("color")) {
             rg = rg.label_color(v);
         }
-        if let Some(v) = node.prop_color("accent")         { rg = rg.selected_color(v); }
-        if let Some(v) = node.prop_color("border_color")   { rg = rg.border_color(v); }
+        if let Some(v) = node.engine_color("accent")         { rg = rg.selected_color(v); }
+        if let Some(v) = node.engine_color("border_color")   { rg = rg.border_color(v); }
         if let Some(v) = node.prop_f32("dot_radius")       { rg = rg.dot_radius(v); }
         if let Some(v) = node.prop_f32("item_gap")         { rg = rg.item_gap(v); }
         if let Some(sel) = selected                         { rg = rg.selected(sel); }
@@ -519,14 +539,14 @@ impl DslLoader {
 
         if let Some(font) = self.resolve_font(node, bindings) { tb = tb.font(font); }
         if let Some(v) = node.prop_f32("font_size")               { tb = tb.font_size(v); }
-        if let Some(v) = node.prop_color("text_color").or_else(|| node.prop_color("color")) {
+        if let Some(v) = node.engine_color("text_color").or_else(|| node.engine_color("color")) {
             tb = tb.text_color(v);
         }
-        if let Some(v) = node.prop_color("placeholder_color")     { tb = tb.placeholder_color(v); }
-        if let Some(v) = node.prop_color("bg")                    { tb = tb.bg(v); }
-        if let Some(v) = node.prop_color("focused_bg")            { tb = tb.focused_bg(v); }
-        if let Some(v) = node.prop_color("border_color")          { tb = tb.border_color(v); }
-        if let Some(v) = node.prop_color("focused_border_color").or_else(|| node.prop_color("accent")) {
+        if let Some(v) = node.engine_color("placeholder_color")     { tb = tb.placeholder_color(v); }
+        if let Some(v) = node.engine_color("bg")                    { tb = tb.bg(v); }
+        if let Some(v) = node.engine_color("focused_bg")            { tb = tb.focused_bg(v); }
+        if let Some(v) = node.engine_color("border_color")          { tb = tb.border_color(v); }
+        if let Some(v) = node.engine_color("focused_border_color").or_else(|| node.engine_color("accent")) {
             tb = tb.focused_border_color(v);
         }
         if let Some(v) = node.prop_f32("corner_radius")           { tb = tb.corner_radius(v); }
@@ -570,8 +590,8 @@ impl DslLoader {
         let mut pb = ProgressBar::new();
         if let Some(v) = node.prop_f32("value")          { pb = pb.value(v); }
         if let Some(v) = node.prop_f32("height")         { pb = pb.height(v); }
-        if let Some(v) = node.prop_color("track_color")  { pb = pb.track_color(v); }
-        if let Some(v) = node.prop_color("fill_color").or_else(|| node.prop_color("accent")) {
+        if let Some(v) = node.engine_color("track_color")  { pb = pb.track_color(v); }
+        if let Some(v) = node.engine_color("fill_color").or_else(|| node.engine_color("accent")) {
             pb = pb.fill_color(v);
         }
         if let Some(v) = node.prop_f32("corner_radius")  { pb = pb.corner_radius(v); }
@@ -627,7 +647,7 @@ impl DslLoader {
 
         if let Some(v) = parse_size_hint(node, "width")  { stack = stack.width(v); }
         if let Some(v) = parse_size_hint(node, "height") { stack = stack.height(v); }
-        if let Some(v) = node.prop_color("bg")           { stack = stack.bg(v); }
+        if let Some(v) = node.engine_color("bg")           { stack = stack.bg(v); }
 
         for child_node in &node.children {
             let element = self.build_node(child_node, bindings);
@@ -652,7 +672,7 @@ impl DslLoader {
     /// properties (bg, border, corner_radius) that Column/Row don't support
     /// natively.
     fn maybe_wrap_bg(&self, elem: Element, node: &Node) -> Element {
-        let bg     = node.prop_color("bg");
+        let bg     = node.engine_color("bg");
         let radius = node.prop_f32("corner_radius");
         let has_border = node.prop_f32("border_width").is_some();
 
@@ -710,7 +730,7 @@ impl DslLoader {
 
     fn apply_border(&self, c: Container, node: &Node) -> Container {
         if let Some(bw) = node.prop_f32("border_width") {
-            let bc = node.prop_color("border_color")
+            let bc = node.engine_color("border_color")
                 .unwrap_or_else(|| Color::from_straight(1.0, 1.0, 1.0, 0.3));
             c.border(Border::new(bw, bc))
         } else {

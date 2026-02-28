@@ -1,6 +1,8 @@
 [workspace]
 members = [
-  "crates/marduk-engine", "crates/marduk-studio",
+  "crates/marduk-engine",
+  "crates/marduk-mkml",
+  "crates/marduk-studio",
   "crates/marduk-ui",
 ]
 resolver = "2"
