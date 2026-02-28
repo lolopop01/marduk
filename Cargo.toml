@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/marduk-engine",
+  "crates/marduk-lsp",
   "crates/marduk-mkml",
   "crates/marduk-studio",
   "crates/marduk-ui",
