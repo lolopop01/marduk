@@ -1,0 +1,390 @@
+// Warehouse capacity & dock status
+Column {
+    padding_left: 20
+    padding_right: 20
+    padding_top: 4
+    padding_bottom: 4
+    gap: 8
+
+    Text "// WAREHOUSE  —  YUL-WEST  (94% capacity)" {
+        font: body
+        size: 10
+        color: #4a4030ff
+    }
+
+    // Overall capacity — 4 bars stacked in 2×2
+    Container {
+        bg: #181510ff
+        border_width: 1
+        border_color: #382c1aff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 12
+
+            Row {
+                align: center
+                gap: 0
+
+                Text "Overall capacity" {
+                    font: body
+                    size: 11
+                    color: #6a5e40ff
+                }
+
+                Container { }
+
+                Text "94%  —  overflow lot full,  clear aisle 7" {
+                    font: body
+                    size: 11
+                    color: #c8780aff
+                }
+            }
+
+            ProgressBar {
+                value: 0.94
+                height: 7
+                accent: #c8780aff
+                track_color: #0e0d0bff
+                corner_radius: 3
+            }
+
+            Row {
+                gap: 24
+                align: start
+
+                Column {
+                    gap: 14
+
+                    Column {
+                        gap: 4
+
+                        Row {
+                            align: center
+                            gap: 0
+
+                            Text "General storage" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+
+                            Container { }
+
+                            Text "93%" {
+                                font: body
+                                size: 10
+                                color: #c8780aff
+                            }
+                        }
+
+                        ProgressBar {
+                            value: 0.93
+                            height: 5
+                            accent: #c8780aff
+                            track_color: #0e0d0bff
+                            corner_radius: 2
+                        }
+                    }
+
+                    Column {
+                        gap: 4
+
+                        Row {
+                            align: center
+                            gap: 0
+
+                            Text "Overflow lot" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+
+                            Container { }
+
+                            Text "FULL" {
+                                font: body
+                                size: 10
+                                color: #b83020ff
+                            }
+                        }
+
+                        ProgressBar {
+                            value: 1.0
+                            height: 5
+                            accent: #b83020ff
+                            track_color: #0e0d0bff
+                            corner_radius: 2
+                        }
+                    }
+                }
+
+                Column {
+                    gap: 14
+
+                    Column {
+                        gap: 4
+
+                        Row {
+                            align: center
+                            gap: 0
+
+                            Text "Cold storage" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+
+                            Container { }
+
+                            Text "71%" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+                        }
+
+                        ProgressBar {
+                            value: 0.71
+                            height: 5
+                            accent: #3a7ab0ff
+                            track_color: #0e0d0bff
+                            corner_radius: 2
+                        }
+                    }
+
+                    Column {
+                        gap: 4
+
+                        Row {
+                            align: center
+                            gap: 0
+
+                            Text "Hazmat bay" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+
+                            Container { }
+
+                            Text "50%" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+                        }
+
+                        ProgressBar {
+                            value: 0.50
+                            height: 5
+                            accent: #4a9a30ff
+                            track_color: #0e0d0bff
+                            corner_radius: 2
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Dock status — 2×2 grid (more space per card)
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 8
+
+            Text "Loading docks" {
+                font: body
+                size: 11
+                color: #6a5e40ff
+            }
+
+            // Top row: Dock A + Dock B
+            Row {
+                gap: 8
+                align: start
+
+                // Dock A — loading
+                Container {
+                    bg: #0e1e0aff
+                    border_width: 1
+                    border_color: #1c3a12ff
+                    corner_radius: 2
+                    padding: 12
+
+                    Column {
+                        gap: 6
+
+                        Row {
+                            align: center
+                            gap: 8
+
+                            Text "DOCK A" {
+                                font: body
+                                size: 11
+                                color: #4a9a30ff
+                            }
+
+                            Text "LOADING" {
+                                font: body
+                                size: 11
+                                color: #d4c49aff
+                            }
+                        }
+
+                        Text "Order #4471  —  47 pallets  —  TRK-001" {
+                            font: body
+                            size: 10
+                            color: #6a5e40ff
+                        }
+
+                        Text "Started 14:08  —  est. complete 15:30" {
+                            font: body
+                            size: 10
+                            color: #4a4030ff
+                        }
+                    }
+                }
+
+                // Dock B — empty / available
+                Container {
+                    bg: #131210ff
+                    border_width: 1
+                    border_color: #252118ff
+                    corner_radius: 2
+                    padding: 12
+
+                    Column {
+                        gap: 6
+
+                        Row {
+                            align: center
+                            gap: 8
+
+                            Text "DOCK B" {
+                                font: body
+                                size: 11
+                                color: #3a3020ff
+                            }
+
+                            Text "EMPTY" {
+                                font: body
+                                size: 11
+                                color: #4a4030ff
+                            }
+                        }
+
+                        Text "No assignment  —  available for inbound" {
+                            font: body
+                            size: 10
+                            color: #3a3020ff
+                        }
+
+                        Text "Last used 11:22  —  TRK-002 (outbound)" {
+                            font: body
+                            size: 10
+                            color: #3a3020ff
+                        }
+                    }
+                }
+            }
+
+            // Bottom row: Dock C + Dock D
+            Row {
+                gap: 8
+                align: start
+
+                // Dock C — unloading
+                Container {
+                    bg: #0e1e0aff
+                    border_width: 1
+                    border_color: #1c3a12ff
+                    corner_radius: 2
+                    padding: 12
+
+                    Column {
+                        gap: 6
+
+                        Row {
+                            align: center
+                            gap: 8
+
+                            Text "DOCK C" {
+                                font: body
+                                size: 11
+                                color: #4a9a30ff
+                            }
+
+                            Text "UNLOADING" {
+                                font: body
+                                size: 11
+                                color: #d4c49aff
+                            }
+                        }
+
+                        Text "Order #4468  —  31 pallets  —  TRK-002" {
+                            font: body
+                            size: 10
+                            color: #6a5e40ff
+                        }
+
+                        Text "Started 13:55  —  est. complete 15:10" {
+                            font: body
+                            size: 10
+                            color: #4a4030ff
+                        }
+                    }
+                }
+
+                // Dock D — blocked
+                Container {
+                    bg: #181510ff
+                    border_width: 1
+                    border_color: #382c1aff
+                    corner_radius: 2
+                    padding: 12
+
+                    Column {
+                        gap: 6
+
+                        Row {
+                            align: center
+                            gap: 8
+
+                            Text "DOCK D" {
+                                font: body
+                                size: 11
+                                color: #c8780aff
+                            }
+
+                            Text "BLOCKED" {
+                                font: body
+                                size: 11
+                                color: #c8780aff
+                            }
+                        }
+
+                        Text "Pallets left in aisle 7 — forklift needed" {
+                            font: body
+                            size: 10
+                            color: #6a5e40ff
+                        }
+
+                        Text "Reported by: P. Lavoie at 13:41" {
+                            font: body
+                            size: 10
+                            color: #4a4030ff
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

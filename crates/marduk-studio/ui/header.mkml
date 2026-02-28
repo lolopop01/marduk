@@ -1,25 +1,52 @@
-// Mission Control header bar
+// Redline Logistics — depot ops header
 Row {
     align: center
-    padding_left: 24
-    padding_right: 24
-    padding_top: 14
-    padding_bottom: 14
-    bg: #0a1828ff
+    padding_left: 20
+    padding_right: 20
+    padding_top: 12
+    padding_bottom: 12
+    bg: #111009ff
     border_width: 1
-    border_color: #0d2c48ff
+    border_color: #252118ff
 
-    Text "MARDUK MISSION CONTROL" {
-        font: body
-        size: 15
-        color: #00e5a0ff
+    Column {
+        gap: 2
+
+        Text "REDLINE LOGISTICS" {
+            font: body
+            size: 14
+            color: #d4c49aff
+        }
+
+        Text "Depot YUL-WEST  ·  Regional Distribution" {
+            font: body
+            size: 10
+            color: #4a4030ff
+        }
     }
 
     Container { }
 
-    Text "SYS: ONLINE  |  v0.1.0" {
-        font: body
-        size: 11
-        color: #2a4860ff
+    Row {
+        gap: 16
+        align: center
+
+        Text "3 ALERTS" {
+            font: body
+            size: 11
+            color: #b83020ff
+        }
+
+        Text "|" {
+            font: body
+            size: 11
+            color: #252118ff
+        }
+
+        Text "ON DUTY: 6 drivers  ·  shift ends 23:00" {
+            font: body
+            size: 11
+            color: #4a4030ff
+        }
     }
 }

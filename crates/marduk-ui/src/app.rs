@@ -107,6 +107,7 @@ pub struct Application {
     title:          String,
     width:          f64,
     height:         f64,
+    zoom:           f32,
     fonts:          Vec<(String, Vec<u8>)>,
     components:     Vec<(String, String)>,
     event_handlers: HashMap<String, Box<dyn FnMut()>>,
@@ -120,6 +121,7 @@ impl Application {
             title:          "marduk".to_string(),
             width:          1280.0,
             height:         720.0,
+            zoom:           1.0,
             fonts:          Vec::new(),
             components:     Vec::new(),
             event_handlers: HashMap::new(),
@@ -137,6 +139,15 @@ impl Application {
     pub fn size(mut self, width: f64, height: f64) -> Self {
         self.width  = width;
         self.height = height;
+        self
+    }
+
+    /// Set the initial zoom level (default `1.0`).
+    ///
+    /// The user can adjust zoom at runtime with **Ctrl + Scroll**.  Values
+    /// below `0.25` or above `4.0` are clamped at render time.
+    pub fn zoom(mut self, z: f32) -> Self {
+        self.zoom = z;
         self
     }
 
@@ -250,6 +261,9 @@ struct UiAppState {
     width:  f64,
     height: f64,
 
+    // Zoom — adjusted at runtime via Ctrl+Scroll.
+    zoom: f32,
+
     // Rendering
     ui_scene:              UiScene,
     rect_renderer:         RectRenderer,
@@ -279,6 +293,7 @@ impl UiAppState {
             title:                 app.title,
             width:                 app.width,
             height:                app.height,
+            zoom:                  app.zoom,
             ui_scene,
             rect_renderer:         RectRenderer::new(),
             rounded_rect_renderer: RoundedRectRenderer::new(),
@@ -304,6 +319,7 @@ impl UiAppState {
             title:                 app.title,
             width:                 app.width,
             height:                app.height,
+            zoom:                  app.zoom,
             ui_scene,
             rect_renderer:         RectRenderer::new(),
             rounded_rect_renderer: RoundedRectRenderer::new(),
@@ -346,22 +362,34 @@ impl UiAppState {
 impl EngineApp for UiAppState {
     fn on_frame(&mut self, ctx: &mut FrameCtx<'_, '_>) -> AppControl {
         let (w, h) = ctx.window.logical_size();
-        let viewport = Vec2::new(w, h);
 
+        // ── Ctrl + Scroll → zoom ──────────────────────────────────────────
+        let ctrl = ctx.input.modifiers.ctrl;
+        let raw_scroll = ctx.input_frame.scroll_delta;
+        if ctrl && raw_scroll != 0.0 {
+            // Each scroll line zooms by ~10%. Negative delta = scroll down = zoom out.
+            // Exponential scale so fast scrolls can't produce negative zoom.
+            // positive raw_scroll = scroll down = zoom out → negative exponent.
+            self.zoom *= f32::exp(-raw_scroll * 0.1);
+            self.zoom = self.zoom.clamp(0.25, 4.0);
+        }
+
+        // Mouse position in *zoomed* logical space (divide by zoom).
         let (mx, my) = ctx.input.pointer_pos.unwrap_or((0.0, 0.0));
-        let mouse_pos = Vec2::new(mx, my);
+        let mouse_pos = Vec2::new(mx / self.zoom, my / self.zoom);
 
-        // Track where the current drag started.
+        // Track where the current drag started (in zoomed space).
         if ctx.input_frame.buttons_pressed.contains(&MouseButton::Left) {
             self.drag_origin = Some(mouse_pos);
         }
-        // Capture the drag start before clearing it — passed as `drag_end` so
-        // widgets receive `DragEnd` even when the button is released outside their rect.
         let drag_end = if ctx.input_frame.buttons_released.contains(&MouseButton::Left) {
             self.drag_origin.take()
         } else {
             None
         };
+
+        // Layout viewport = window size / zoom (widgets lay out in this space).
+        let ui_viewport = Vec2::new(w / self.zoom, h / self.zoom);
 
         let ui_input = UiInput {
             mouse_pos,
@@ -369,21 +397,20 @@ impl EngineApp for UiAppState {
             mouse_clicked: ctx.input_frame.buttons_released.contains(&MouseButton::Left),
             text_input:    ctx.input_frame.text.iter().map(|t| t.text.clone()).collect(),
             keys_pressed:  ctx.input_frame.keys_pressed.iter().copied().collect(),
-            scroll_delta:  ctx.input_frame.scroll_delta,
+            // Swallow scroll delta when Ctrl is held (it was consumed for zoom).
+            scroll_delta:  if ctrl { 0.0 } else { raw_scroll },
             drag_origin:   self.drag_origin,
             drag_end,
         };
 
         // ── Layout + paint ────────────────────────────────────────────────
-        // The returned &mut DrawList is not captured here; we access it below
-        // via self.ui_scene.draw_list so the borrow is released before render.
         match (&self.doc, &mut self.root) {
             (Some(doc), _) => {
                 let root = self.loader.build(doc, &self.bindings);
-                let _ = self.ui_scene.frame(root, viewport, &ui_input);
+                let _ = self.ui_scene.frame(root, ui_viewport, &ui_input);
             }
             (None, Some(root)) => {
-                let _ = self.ui_scene.frame_ref(root, viewport, &ui_input);
+                let _ = self.ui_scene.frame_ref(root, ui_viewport, &ui_input);
             }
             _ => {}
         }
@@ -402,8 +429,9 @@ impl EngineApp for UiAppState {
         let r_rr  = &mut self.rounded_rect_renderer;
         let r_c   = &mut self.circle_renderer;
         let r_t   = &mut self.text_renderer;
+        let zoom  = self.zoom;
 
-        ctx.render(marduk_engine::paint::Color::from_straight(0.07, 0.07, 0.09, 1.0), |rctx, target| {
+        ctx.render_scaled(zoom, marduk_engine::paint::Color::from_straight(0.054, 0.051, 0.043, 1.0), |rctx, target| {
             r_r.render(rctx, target, dl);
             r_rr.render(rctx, target, dl);
             r_c.render(rctx, target, dl);

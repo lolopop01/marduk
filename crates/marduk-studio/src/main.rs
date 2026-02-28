@@ -1,217 +1,58 @@
 use marduk_ui::Application;
 
 fn main() {
-    // Startup banner — printed before the window opens.
     println!();
-    println!("  ╔════════════════════════════════════════╗");
-    println!("  ║       MARDUK MISSION CONTROL v0.1      ║");
-    println!("  ║   wgpu renderer  ·  marduk-ui dsl      ║");
-    println!("  ╠════════════════════════════════════════╣");
-    println!("  ║  All subsystems initialized.           ║");
-    println!("  ║  Awaiting commands from operator...    ║");
-    println!("  ╚════════════════════════════════════════╝");
+    println!("  ╔══════════════════════════════════════════╗");
+    println!("  ║     REDLINE LOGISTICS — OPS CONSOLE      ║");
+    println!("  ║   Depot YUL-WEST  ·  marduk-ui v0.1      ║");
+    println!("  ╠══════════════════════════════════════════╣");
+    println!("  ║  Fleet: 4 units  (1 breakdown, 1 warn)   ║");
+    println!("  ║  Warehouse: 94%  ·  2 orders overdue     ║");
+    println!("  ║  Awaiting dispatcher input...            ║");
+    println!("  ╚══════════════════════════════════════════╝");
     println!();
 
     Application::new()
-        .title("Marduk Mission Control")
-        .size(820.0, 560.0)
+        .title("Redline Logistics — Depot YUL-WEST")
+        .size(960.0, 660.0)
+        .zoom(1.0)   // Ctrl+Scroll to adjust at runtime
         .font("body", load_font())
-        .component("Header",   include_str!("../ui/header.mkml"))
-        .component("Controls", include_str!("../ui/controls.mkml"))
-        .component("Settings", include_str!("../ui/settings.mkml"))
-        // ── SYSTEMS ───────────────────────────────────────────────────────
-        .on_event("launch_sequence", || {
+        // ── components ────────────────────────────────────────────────────
+        .component("Header",    include_str!("../ui/header.mkml"))
+        .component("Fleet",     include_str!("../ui/components/fleet.mkml"))
+        .component("Warehouse", include_str!("../ui/components/warehouse.mkml"))
+        .component("Dispatch",  include_str!("../ui/components/dispatch.mkml"))
+        .component("Settings",  include_str!("../ui/components/settings.mkml"))
+        // ── scroll ────────────────────────────────────────────────────────
+        .on_event("main_scroll", || {})
+        // ── dispatch ──────────────────────────────────────────────────────
+        .on_event("dispatch_note_changed", || {})
+        .on_event("send_dispatch_note", || {
             println!();
-            println!("  ╔═══════════════════════════════════════╗");
-            println!("  ║      LAUNCH SEQUENCE INITIATED        ║");
-            println!("  ╠═══════════════════════════════════════╣");
-            println!("  ║  T-05  Primary systems check ..  GO   ║");
-            println!("  ║  T-04  Fuel pressure nominal  ..  GO  ║");
-            println!("  ║  T-03  Navigation locked      ..  GO  ║");
-            println!("  ║  T-02  Engine ignition        ..  GO  ║");
-            println!("  ║  T-01  Launch commit          ..  GO  ║");
-            println!("  ╠═══════════════════════════════════════╣");
-            println!("  ║         *** LIFTOFF CONFIRMED ***     ║");
-            println!("  ╚═══════════════════════════════════════╝");
+            println!("  [DISPATCH] Note queued for transmission.");
+            println!("  Encoding ... AES-128");
+            println!("  Status   ... SENT to active drivers");
             println!();
         })
-        .on_event("run_diagnostics", || {
-            println!();
-            println!("  [DIAGNOSTICS] Running full system check...");
-            println!();
-            println!("  CPU      ████████████████░░░░  78%   OK");
-            println!("  MEMORY   ████████░░░░░░░░░░░░  41%   OK");
-            println!("  GPU      ███████████████████░  96%   WARM");
-            println!("  NETWORK  ████░░░░░░░░░░░░░░░░  19%   OK");
-            println!("  STORAGE  ██████████░░░░░░░░░░  51%   OK");
-            println!("  BATTERY  ████████████████████  100%  OK");
-            println!();
-            println!("  1 warning — GPU running hot. Check airflow.");
-            println!();
+        .on_event_state("clear_dispatch_note", |state| {
+            state.clear("dispatch_note");
+            println!("  [DISPATCH] Note cleared.");
         })
-        .on_event("scan_sector", || {
-            println!();
-            println!("  [SCAN] Sweeping sector Alpha-7...");
-            println!();
-            println!("    . . . . . . . * . . . . . . . . .");
-            println!("    . . . . . . . . . . @ . . . . . .");
-            println!("    . . . # . . . . . . . . . . . . .");
-            println!("    . . . . . . . . . . . . . . * . .");
-            println!("    . . . . . . . . . . . . . . . . .");
-            println!();
-            println!("  Objects: 3   Threats: NONE   Anomalies: 1");
-            println!("  Object @ at [10,1] — uncharted. Flag for analysis.");
-            println!();
-        })
-        // ── DATA OPS ──────────────────────────────────────────────────────
-        .on_event("transmit_data", || {
-            println!();
-            println!("  [TX] Transmitting data packet...");
-            println!();
-            println!("  Endpoint  >  192.168.0.1:7777");
-            println!("  Payload   >  1,337 bytes");
-            println!("  Encoding  >  AES-256-GCM");
-            println!("  Checksum  >  0xDEADBEEF (verified)");
-            println!("  Latency   >  12 ms");
-            println!("  Status    >  SENT OK");
-            println!();
-        })
-        .on_event("analyze_anomaly", || {
-            println!();
-            println!("  [ANOMALY] Non-standard signature detected!");
-            println!();
-            println!("  Frequency  :  42.7 THz");
-            println!("  Origin     :  Grid [10, 1] sector Alpha-7");
-            println!("  Pattern    :  periodic / 3.2s interval");
-            println!("  Type       :  UNKNOWN");
-            println!("  Risk level :  MODERATE");
-            println!();
-            println!("  Recommendation: deploy probe, do not engage.");
-            println!();
-        })
-        .on_event("calibrate_sensors", || {
-            println!();
-            println!("  [CALIBRATE] Sensor array calibration...");
-            println!();
-            println!("  Sensor 1   PASS   delta = 0.001");
-            println!("  Sensor 2   PASS   delta = 0.003");
-            println!("  Sensor 3   FAIL   delta = 1.847  (!)");
-            println!("  Sensor 4   PASS   delta = 0.002");
-            println!("  Sensor 5   PASS   delta = 0.004");
-            println!();
-            println!("  WARNING: Sensor 3 out of tolerance. Schedule maintenance.");
-            println!();
-        })
-        // ── OPERATIONS ────────────────────────────────────────────────────
-        .on_event("engage_warp", || {
-            println!();
-            println!("  [WARP] Initiating jump drive sequence...");
-            println!();
-            println!("  Destination   :  Proxima Centauri b");
-            println!("  Distance      :  4.24 light years");
-            println!("  Jump window   :  open (stable)");
-            println!("  Core temp     :  nominal");
-            println!();
-            println!("                * * * WHOOOOSH * * *");
-            println!();
-            println!("  Jump complete. Welcome to the neighbourhood.");
-            println!();
-        })
-        .on_event("activate_shields", || {
-            println!();
-            println!("  [SHIELDS] Defensive array status:");
-            println!();
-            println!("  Forward    [████████████]  100%  FULL");
-            println!("  Aft        [█████████░░░]   78%  OK");
-            println!("  Port       [████████████]  100%  FULL");
-            println!("  Starboard  [███████░░░░░]   62%  LOW");
-            println!();
-            println!("  Average integrity: 85%  —  shields holding.");
-            println!("  Note: starboard emitter needs recharge.");
-            println!();
-        })
-        .on_event("hail_frequency", || {
-            println!();
-            println!("  [COMM] Opening hailing frequencies...");
-            println!("  Broadcasting on 432.1 MHz...");
-            println!();
-            println!("  .");
-            println!("  . .");
-            println!("  . . .");
-            println!();
-            println!("  Response received:");
-            println!("  \"This is Proxima Station — please identify yourself.\"");
-            println!();
-            println!("  MARDUK: \"We come in peace. Also, we need coffee.\"");
-            println!();
-        })
-        // ── OVERRIDE ──────────────────────────────────────────────────────
-        .on_event("emergency_stop", || {
-            println!();
-            println!("  !!! EMERGENCY STOP ACTIVATED !!!");
-            println!();
-            println!("  Non-essential systems offline.");
-            println!("  Propulsion    >  HALTED");
-            println!("  Navigation    >  STANDBY");
-            println!("  Weapons       >  SAFED");
-            println!("  Life support  >  ACTIVE (protected)");
-            println!();
-            println!("  Awaiting operator clearance to resume.");
-            println!();
-        })
-        .on_event("reset_systems", || {
-            println!();
-            println!("  [RESET] Full system reset in progress...");
-            println!();
-            println!("  Flushing memory banks         DONE");
-            println!("  Reinitializing subsystems     DONE");
-            println!("  Loading default config        DONE");
-            println!("  Verifying sensor array        DONE");
-            println!("  Handshaking with core         DONE");
-            println!();
-            println!("  All systems nominal. Ready for operation.");
-            println!();
-        })
-        .on_event("deploy_payload", || {
-            println!();
-            println!("  [DEPLOY] Payload deployment pipeline:");
-            println!();
-            println!("  Build       cargo build --release       OK");
-            println!("  Test        cargo test (42 passed)      OK");
-            println!("  Package     marduk-v0.1.0-x86_64        OK");
-            println!("  Upload      cluster-prod-7  (1.2 MB/s)  OK");
-            println!("  Health      GET /healthz -> 200         OK");
-            println!("  Smoke       3 / 3 checks passing        OK");
-            println!();
-            println!("  Deployment successful. Enjoy the new version!");
-            println!();
-        })
-        // ── SETTINGS ──────────────────────────────────────────────────────
-        .on_event("main_scroll",             || {}) // silent — scroll offset persists in bindings
-        .on_event("reactor_power_changed",  || println!("  [POWER] Reactor level adjusted."))
-        .on_event("shield_power_changed",   || println!("  [POWER] Shield generator output adjusted."))
-        .on_event("engine_power_changed",   || println!("  [POWER] Engine throttle adjusted."))
-        .on_event("life_support_toggled",   || println!("  [SYS] Life support toggled."))
-        .on_event("weapons_toggled",        || println!("  [SYS] Weapons status changed."))
-        .on_event("stealth_toggled",        || println!("  [SYS] Stealth mode toggled."))
-        .on_event("autopilot_toggled",      || println!("  [SYS] Autopilot toggled."))
-        .on_event("gravity_toggled",        || println!("  [SYS] Gravity plating toggled."))
-        .on_event("beacon_toggled",         || println!("  [SYS] Emergency beacon toggled."))
-        .on_event("comms_toggled",          || println!("  [SYS] Comms blackout toggled."))
-        .on_event("nav_mode_changed",       || println!("  [NAV] Navigation mode changed."))
-        .on_event("comms_draft_changed",    || {})   // silent, just persists state
-        .on_event("comms_transmit",         || {
-            println!();
-            println!("  [COMMS] Message queued for transmission.");
-            println!("  Encoding ... AES-256-GCM");
-            println!("  Status  ... QUEUED");
-            println!();
-        })
-        .on_event_state("comms_clear", |state| {
-            state.clear("comms_message");
-            println!("  [COMMS] Draft cleared.");
-        })
-        .on_event("window_close", || std::process::exit(0))
+        // ── thresholds (sliders) ──────────────────────────────────────────
+        .on_event("fuel_threshold_changed",  || println!("  [CFG] Fuel warning threshold updated."))
+        .on_event("cap_threshold_changed",   || println!("  [CFG] Capacity warning threshold updated."))
+        .on_event("overdue_buffer_changed",  || println!("  [CFG] Overdue ETA buffer updated."))
+        // ── toggles ───────────────────────────────────────────────────────
+        .on_event("gps_toggled",             || println!("  [SYS] GPS tracking toggled."))
+        .on_event("auto_dispatch_toggled",   || println!("  [SYS] Auto-dispatch toggled."))
+        .on_event("sms_toggled",             || println!("  [SYS] SMS alerts toggled."))
+        .on_event("night_logging_toggled",   || println!("  [SYS] Night shift logging toggled."))
+        // ── checkboxes ────────────────────────────────────────────────────
+        .on_event("load_photo_toggled",      || println!("  [CFG] Require load photo toggled."))
+        .on_event("idle_log_toggled",        || println!("  [CFG] Idle time logging toggled."))
+        .on_event("maint_remind_toggled",    || println!("  [CFG] Maintenance reminders toggled."))
+        // ── shift schedule (radio) ────────────────────────────────────────
+        .on_event("shift_mode_changed",      || println!("  [CFG] Shift schedule updated."))
         .run(include_str!("../ui/main.mkml"))
 }
 

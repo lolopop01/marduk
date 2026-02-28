@@ -1,0 +1,389 @@
+// Depot configuration & weekly metrics
+Column {
+    padding_left: 20
+    padding_right: 20
+    padding_top: 4
+    padding_bottom: 24
+    gap: 8
+
+    Text "// DEPOT CONFIGURATION" {
+        font: body
+        size: 10
+        color: #4a4030ff
+    }
+
+    // Alert thresholds
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 12
+
+            Text "Alert thresholds" {
+                font: body
+                size: 11
+                color: #6a5e40ff
+            }
+
+            Row {
+                gap: 32
+                align: start
+
+                Column {
+                    gap: 6
+
+                    Text "Fuel warning level" {
+                        font: body
+                        size: 10
+                        color: #6a5e40ff
+                    }
+
+                    Slider {
+                        font: body
+                        state_key: fuel_warn_pct
+                        min: 10
+                        max: 50
+                        value: 25
+                        accent: #c8780aff
+                        track_color: #0e0d0bff
+                        on_change: fuel_threshold_changed
+                    }
+                }
+
+                Column {
+                    gap: 6
+
+                    Text "Capacity warning %" {
+                        font: body
+                        size: 10
+                        color: #6a5e40ff
+                    }
+
+                    Slider {
+                        font: body
+                        state_key: cap_warn_pct
+                        min: 70
+                        max: 100
+                        value: 90
+                        accent: #c8780aff
+                        track_color: #0e0d0bff
+                        on_change: cap_threshold_changed
+                    }
+                }
+
+                Column {
+                    gap: 6
+
+                    Text "ETA overdue buffer (min)" {
+                        font: body
+                        size: 10
+                        color: #6a5e40ff
+                    }
+
+                    Slider {
+                        font: body
+                        state_key: overdue_buffer
+                        min: 0
+                        max: 60
+                        value: 15
+                        accent: #c8780aff
+                        track_color: #0e0d0bff
+                        on_change: overdue_buffer_changed
+                    }
+                }
+            }
+        }
+    }
+
+    // System toggles
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 12
+
+            Text "System options" {
+                font: body
+                size: 11
+                color: #6a5e40ff
+            }
+
+            Row {
+                gap: 40
+                align: start
+
+                Column {
+                    gap: 10
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: gps_tracking
+                            checked: true
+                            on_color: #4a9a30ff
+                            off_color: #1e1c16ff
+                            on_change: gps_toggled
+                        }
+
+                        Text "GPS tracking" {
+                            font: body
+                            size: 12
+                            color: #d4c49aff
+                        }
+                    }
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: auto_dispatch
+                            checked: false
+                            on_color: #4a9a30ff
+                            off_color: #1e1c16ff
+                            on_change: auto_dispatch_toggled
+                        }
+
+                        Text "Auto-dispatch" {
+                            font: body
+                            size: 12
+                            color: #d4c49aff
+                        }
+                    }
+                }
+
+                Column {
+                    gap: 10
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: sms_alerts
+                            checked: true
+                            on_color: #4a9a30ff
+                            off_color: #1e1c16ff
+                            on_change: sms_toggled
+                        }
+
+                        Text "SMS alerts to drivers" {
+                            font: body
+                            size: 12
+                            color: #d4c49aff
+                        }
+                    }
+
+                    Row {
+                        gap: 10
+                        align: center
+
+                        Toggle {
+                            state_key: night_logging
+                            checked: false
+                            on_color: #3a7ab0ff
+                            off_color: #1e1c16ff
+                            on_change: night_logging_toggled
+                        }
+
+                        Text "Night shift logging" {
+                            font: body
+                            size: 12
+                            color: #d4c49aff
+                        }
+                    }
+                }
+
+                Column {
+                    gap: 10
+
+                    Checkbox "Require load photo" {
+                        font: body
+                        font_size: 12
+                        state_key: load_photo
+                        checked: true
+                        checked_color: #4a9a30ff
+                        border_color: #3a3020ff
+                        on_change: load_photo_toggled
+                    }
+
+                    Checkbox "Log idle time" {
+                        font: body
+                        font_size: 12
+                        state_key: log_idle
+                        checked: true
+                        checked_color: #4a9a30ff
+                        border_color: #3a3020ff
+                        on_change: idle_log_toggled
+                    }
+
+                    Checkbox "Maintenance reminders" {
+                        font: body
+                        font_size: 12
+                        state_key: maint_remind
+                        checked: true
+                        checked_color: #4a9a30ff
+                        border_color: #3a3020ff
+                        on_change: maint_remind_toggled
+                    }
+                }
+            }
+        }
+    }
+
+    // Shift schedule + weekly metrics
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 12
+
+            Row {
+                gap: 48
+                align: start
+
+                Column {
+                    gap: 8
+
+                    Text "Shift schedule" {
+                        font: body
+                        size: 11
+                        color: #6a5e40ff
+                    }
+
+                    RadioGroup {
+                        font: body
+                        font_size: 12
+                        state_key: shift_mode
+                        default: split
+                        accent: #c8780aff
+                        border_color: #3a3020ff
+                        item_gap: 8
+                        on_change: shift_mode_changed
+
+                        RadioOption "Day only  (06:00 – 18:00)" { value: day }
+                        RadioOption "Split  (06–14 and 18–02)"  { value: split }
+                        RadioOption "24 / 7  continuous"        { value: full }
+                    }
+                }
+
+                Column {
+                    gap: 12
+
+                    Text "Week-to-date metrics" {
+                        font: body
+                        size: 11
+                        color: #6a5e40ff
+                    }
+
+                    Column {
+                        gap: 6
+
+                        Row {
+                            align: center
+                            gap: 0
+
+                            Text "On-time delivery rate" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+
+                            Container { }
+
+                            Text "81%" {
+                                font: body
+                                size: 10
+                                color: #d4c49aff
+                            }
+                        }
+
+                        ProgressBar {
+                            value: 0.81
+                            height: 5
+                            accent: #4a9a30ff
+                            track_color: #0e0d0bff
+                            corner_radius: 2
+                        }
+                    }
+
+                    Column {
+                        gap: 6
+
+                        Row {
+                            align: center
+                            gap: 0
+
+                            Text "Fleet avg fuel efficiency" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+
+                            Container { }
+
+                            Text "58%" {
+                                font: body
+                                size: 10
+                                color: #c8780aff
+                            }
+                        }
+
+                        ProgressBar {
+                            value: 0.58
+                            height: 5
+                            accent: #c8780aff
+                            track_color: #0e0d0bff
+                            corner_radius: 2
+                        }
+                    }
+
+                    Column {
+                        gap: 6
+
+                        Row {
+                            align: center
+                            gap: 0
+
+                            Text "Maintenance compliance" {
+                                font: body
+                                size: 10
+                                color: #6a5e40ff
+                            }
+
+                            Container { }
+
+                            Text "67%" {
+                                font: body
+                                size: 10
+                                color: #c8780aff
+                            }
+                        }
+
+                        ProgressBar {
+                            value: 0.67
+                            height: 5
+                            accent: #c8780aff
+                            track_color: #0e0d0bff
+                            corner_radius: 2
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

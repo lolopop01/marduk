@@ -1,32 +1,33 @@
-// Marduk Mission Control — root layout
-import "header.mkml"   as Header
-import "controls.mkml" as Controls
-import "settings.mkml" as Settings
+// Redline Logistics — root layout
+import "header.mkml"                  as Header
+import "components/fleet.mkml"        as Fleet
+import "components/warehouse.mkml"    as Warehouse
+import "components/dispatch.mkml"     as Dispatch
+import "components/settings.mkml"     as Settings
 
-// Stack fills the window. Children are anchored to its edges.
-// On resize, the header stays fixed at the top; the scroll area
-// stretches to fill whatever space remains below it.
 Stack {
-    bg: #040810ff
+    bg: #0e0d0bff
 
-    // Header — pinned to the top edge, full width, fixed height
     Header {
         top: 0
         left: 0
         right: 0
-        height: 47
+        height: 48
     }
 
-    // Scrollable content — fills everything below the header
     ScrollView {
-        top: 47
+        top: 48
         left: 0
         right: 0
         bottom: 0
         on_scroll: main_scroll
 
         Column {
-            Controls { }
+            gap: 0
+
+            Fleet { }
+            Warehouse { }
+            Dispatch { }
             Settings { }
         }
     }

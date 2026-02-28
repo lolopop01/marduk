@@ -52,16 +52,32 @@ impl<'a, 'w> FrameCtx<'a, 'w> {
     /// Clears the surface with `clear`, calls `draw` with a ready [`RenderCtx`] and
     /// [`RenderTarget`], then presents the frame.
     ///
-    /// This is the primary entry point for rendering: it handles frame acquisition,
-    /// the clear pass, viewport construction, and presentation. The caller only
-    /// needs to issue draw calls inside the closure.
-    ///
-    /// Returns [`AppControl::Continue`] on success or [`AppControl::Exit`] on a
-    /// fatal surface error.
+    /// Equivalent to [`render_scaled`] with `zoom = 1.0`.
     pub fn render<F>(&mut self, clear: Color, draw: F) -> AppControl
     where
         F: FnOnce(&RenderCtx<'_>, &mut RenderTarget<'_>),
     {
+        self.render_scaled(1.0, clear, draw)
+    }
+
+    /// Like [`render`] but applies a zoom/scale factor.
+    ///
+    /// The `zoom` factor shrinks the logical viewport seen by renderers
+    /// (`viewport = window_size / zoom`) while scaling up the physical pixel
+    /// mapping (`scale_factor *= zoom`).  The net effect is that all draw-list
+    /// coordinates — which live in the *zoomed* logical space — appear
+    /// `zoom × larger` on screen without any changes to the renderers or
+    /// shaders.
+    ///
+    /// Mouse coordinates should be divided by the same `zoom` factor before
+    /// being compared against widget rects.
+    ///
+    /// `zoom` is clamped to `[0.05, 32.0]`.
+    pub fn render_scaled<F>(&mut self, zoom: f32, clear: Color, draw: F) -> AppControl
+    where
+        F: FnOnce(&RenderCtx<'_>, &mut RenderTarget<'_>),
+    {
+        let zoom = zoom.clamp(0.05, 32.0);
         let (w, h) = self.window.logical_size();
         let scale_factor = self.window.window.scale_factor() as f32;
 
@@ -101,12 +117,16 @@ impl<'a, 'w> FrameCtx<'a, 'w> {
             });
         }
 
+        // Zoom is applied by shrinking the logical viewport and scaling up
+        // scale_factor by the same amount.  Renderers upload `viewport` to
+        // their viewport UBO (used in NDC conversion) and use `scale_factor`
+        // for scissor rect conversion — both adjustments cancel out perfectly.
         let rctx = RenderCtx::new(
             self.gpu.device(),
             self.gpu.queue(),
             self.gpu.surface_format(),
-            Viewport::new(w, h),
-            scale_factor,
+            Viewport::new(w / zoom, h / zoom),
+            scale_factor * zoom,
         );
 
         // RenderTarget borrows frame.encoder; dropped before submit() takes frame.
