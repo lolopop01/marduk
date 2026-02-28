@@ -285,11 +285,13 @@ where
 
         match &event {
             WindowEvent::CloseRequested => {
-                self.destroy_window_entry(window_id);
-                if self.windows.is_empty() {
-                    self.request_exit();
-                    event_loop.exit();
-                }
+                // Do NOT call destroy_window_entry here. AppState's field drop
+                // order (app before windows) ensures wgpu resources are freed
+                // before the Device. Eagerly dropping the Gpu here would destroy
+                // VkDevice while the app's wgpu Buffers/Textures are still alive,
+                // causing a use-after-free (SIGSEGV) when they later drop.
+                self.request_exit();
+                event_loop.exit();
             }
 
             WindowEvent::Resized(new_size) => {
