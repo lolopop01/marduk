@@ -355,9 +355,13 @@ impl EngineApp for UiAppState {
         if ctx.input_frame.buttons_pressed.contains(&MouseButton::Left) {
             self.drag_origin = Some(mouse_pos);
         }
-        if ctx.input_frame.buttons_released.contains(&MouseButton::Left) {
-            self.drag_origin = None;
-        }
+        // Capture the drag start before clearing it — passed as `drag_end` so
+        // widgets receive `DragEnd` even when the button is released outside their rect.
+        let drag_end = if ctx.input_frame.buttons_released.contains(&MouseButton::Left) {
+            self.drag_origin.take()
+        } else {
+            None
+        };
 
         let ui_input = UiInput {
             mouse_pos,
@@ -367,6 +371,7 @@ impl EngineApp for UiAppState {
             keys_pressed:  ctx.input_frame.keys_pressed.iter().copied().collect(),
             scroll_delta:  ctx.input_frame.scroll_delta,
             drag_origin:   self.drag_origin,
+            drag_end,
         };
 
         // ── Layout + paint ────────────────────────────────────────────────

@@ -138,8 +138,9 @@ impl Widget for Slider {
                 if let Some(f) = &mut self.on_drag { f(self.value); }
                 EventResult::Consumed
             }
-            // Click (release): commit the value and fire the public event.
-            UiEvent::Click { pos } if rect.contains(*pos) => {
+            // DragEnd: fires when the button is released regardless of cursor position.
+            // Guards on `start` so only the slider that owns the drag commits.
+            UiEvent::DragEnd { pos, start } if rect.contains(*start) => {
                 self.value = value_at(pos.x);
                 if let Some(f) = &mut self.on_drag   { f(self.value); }
                 if let Some(f) = &mut self.on_change { f(self.value); }

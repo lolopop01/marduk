@@ -29,6 +29,9 @@ pub struct UiInput {
     pub scroll_delta: f32,
     /// Where the current mouse drag started (`None` when no drag is in progress).
     pub drag_origin: Option<Vec2>,
+    /// Set to `Some(start)` for the single frame in which a drag ends (button released).
+    /// Used to dispatch `DragEnd` so widgets can commit regardless of release position.
+    pub drag_end: Option<Vec2>,
 }
 
 // ── UiScene ───────────────────────────────────────────────────────────────
@@ -110,6 +113,9 @@ impl UiScene {
             if let Some(start) = input.drag_origin {
                 root.on_event(&UiEvent::Drag { pos: input.mouse_pos, start }, rect, &ctx);
             }
+            if let Some(start) = input.drag_end {
+                root.on_event(&UiEvent::DragEnd { pos: input.mouse_pos, start }, rect, &ctx);
+            }
             if input.mouse_clicked {
                 root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
             }
@@ -176,6 +182,9 @@ impl UiScene {
             root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
             if let Some(start) = input.drag_origin {
                 root.on_event(&UiEvent::Drag { pos: input.mouse_pos, start }, rect, &ctx);
+            }
+            if let Some(start) = input.drag_end {
+                root.on_event(&UiEvent::DragEnd { pos: input.mouse_pos, start }, rect, &ctx);
             }
             if input.mouse_clicked {
                 root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);

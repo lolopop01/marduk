@@ -19,6 +19,12 @@ pub enum UiEvent {
     ///
     /// `delta` > 0 → scroll down (reveal content below); < 0 → scroll up.
     ScrollWheel { delta: f32 },
+    /// Primary button released after a drag.
+    ///
+    /// `pos` is where the button was released; `start` is where the drag began.
+    /// Unlike `Click`, this fires even when `pos` is outside the widget — use
+    /// `rect.contains(start)` to check ownership of the drag.
+    DragEnd { pos: Vec2, start: Vec2 },
 }
 
 /// Result returned by [`Widget::on_event`].
