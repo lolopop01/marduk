@@ -440,12 +440,20 @@ impl DslLoader {
         if let Some(v) = node.prop_f32("corner_radius") { sl = sl.corner_radius(v); }
 
         if let Some(event_name) = node.prop_str("on_change") {
+            let state_drag = Rc::clone(&bindings.widget_state);
+            let state_rel  = Rc::clone(&bindings.widget_state);
             let queue = Rc::clone(&bindings.event_queue);
-            let state = Rc::clone(&bindings.widget_state);
             let key   = state_key.unwrap_or_else(|| event_name.to_string());
             let name  = event_name.to_string();
+            // on_drag: keep widget_state up-to-date so the thumb tracks visually,
+            // but do NOT push to event_queue.
+            let key_drag = key.clone();
+            sl = sl.on_drag(move |v| {
+                state_drag.borrow_mut().insert(key_drag.clone(), WidgetStateValue::Float(v));
+            });
+            // on_change (release): final commit + public event.
             sl = sl.on_change(move |v| {
-                state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(v));
+                state_rel.borrow_mut().insert(key.clone(), WidgetStateValue::Float(v));
                 queue.borrow_mut().push(name.clone());
             });
         }

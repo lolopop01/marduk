@@ -30,6 +30,9 @@ pub struct Slider {
     thumb_color: Color,
     thumb_border_color: Color,
     corner_radius: f32,
+    /// Called on every drag move — used to persist visual state without firing an event.
+    on_drag: Option<Box<dyn FnMut(f32)>>,
+    /// Called once on mouse release — the public "value committed" event.
     on_change: Option<Box<dyn FnMut(f32)>>,
 }
 
@@ -46,6 +49,7 @@ impl Slider {
             thumb_color: Color::from_straight(1.0, 1.0, 1.0, 1.0),
             thumb_border_color: Color::from_straight(0.4, 0.6, 0.9, 1.0),
             corner_radius: 2.0,
+            on_drag: None,
             on_change: None,
         }
     }
@@ -62,6 +66,10 @@ impl Slider {
     pub fn fill_color(mut self, v: Color) -> Self { self.fill_color = v; self }
     pub fn thumb_color(mut self, v: Color) -> Self { self.thumb_color = v; self }
     pub fn corner_radius(mut self, v: f32) -> Self { self.corner_radius = v; self }
+    pub fn on_drag(mut self, f: impl FnMut(f32) + 'static) -> Self {
+        self.on_drag = Some(Box::new(f));
+        self
+    }
     pub fn on_change(mut self, f: impl FnMut(f32) + 'static) -> Self {
         self.on_change = Some(Box::new(f));
         self
@@ -119,20 +127,22 @@ impl Widget for Slider {
     }
 
     fn on_event(&mut self, event: &UiEvent, rect: Rect, _ctx: &LayoutCtx<'_>) -> EventResult {
-        let update = |value: &mut f32, on_change: &mut Option<Box<dyn FnMut(f32)>>, x: f32| {
+        let value_at = |x: f32| -> f32 {
             let t = ((x - rect.origin.x) / rect.size.x).clamp(0.0, 1.0);
-            *value = self.min + t * (self.max - self.min);
-            if let Some(f) = on_change { f(*value); }
+            self.min + t * (self.max - self.min)
         };
         match event {
-            // Drag: follow the mouse as long as the drag started inside this slider.
+            // Drag: update value + state (visual), no public event.
             UiEvent::Drag { pos, start } if rect.contains(*start) => {
-                update(&mut self.value, &mut self.on_change, pos.x);
+                self.value = value_at(pos.x);
+                if let Some(f) = &mut self.on_drag { f(self.value); }
                 EventResult::Consumed
             }
-            // Click (release): click-to-set anywhere on the track.
+            // Click (release): commit the value and fire the public event.
             UiEvent::Click { pos } if rect.contains(*pos) => {
-                update(&mut self.value, &mut self.on_change, pos.x);
+                self.value = value_at(pos.x);
+                if let Some(f) = &mut self.on_drag   { f(self.value); }
+                if let Some(f) = &mut self.on_change { f(self.value); }
                 EventResult::Consumed
             }
             _ => EventResult::Ignored,
