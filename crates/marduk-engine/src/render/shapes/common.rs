@@ -90,12 +90,27 @@ pub(super) fn logical_clip_to_scissor(
     if w == 0 || h == 0 { None } else { Some((x, y, w, h)) }
 }
 
+// ── viewport UBO binding size ─────────────────────────────────────────────
+
+/// Returns the `wgpu` minimum binding size for the viewport uniform buffer.
+///
+/// `ViewportUniform` contains two `[f32; 2]` fields (16 bytes total) so its
+/// size is always non-zero. Centralising this avoids `.unwrap()` at each
+/// renderer's pipeline-creation site.
+pub(super) fn viewport_ubo_min_binding_size() -> std::num::NonZeroU64 {
+    std::num::NonZeroU64::new(std::mem::size_of::<ViewportUniform>() as u64)
+        .expect("ViewportUniform has non-zero size by construction")
+}
+
 // ── paint resolution ──────────────────────────────────────────────────────
 
 /// Converts a `Paint` to `(color0, color1, grad_p0, grad_p1)` for gradient-capable shaders.
 ///
-/// Solid fills produce identical colors and degenerate gradient points (zero-length),
-/// so the shader falls back to `color0` as the uniform fill.
+/// Solid fills produce identical colors and a degenerate (zero-length) gradient
+/// axis, so the shader falls back to `color0` as a uniform fill.
+///
+/// Linear gradients are clamped to 2 stops (first and last); more stops are
+/// unsupported and emit a one-time debug message.
 pub(super) fn resolve_paint(
     paint: &Paint,
     warned_multi_stop: &mut bool,
@@ -106,6 +121,7 @@ pub(super) fn resolve_paint(
             (col, col, [0.0, 0.0], [0.0, 0.0])
         }
         Paint::LinearGradient(g) => {
+            // Degenerate gradient (< 2 stops): treat as solid using the first stop.
             if g.stops.len() < 2 {
                 let col = g
                     .stops
@@ -117,8 +133,9 @@ pub(super) fn resolve_paint(
                 log::debug!("only 2-stop gradients supported; using first and last stop");
                 *warned_multi_stop = true;
             }
-            let c0 = g.stops.first().unwrap().color;
-            let c1 = g.stops.last().unwrap().color;
+            // Safety: len >= 2 is checked above, so first/last always exist.
+            let c0 = g.stops[0].color;
+            let c1 = g.stops[g.stops.len() - 1].color;
             (
                 [c0.r, c0.g, c0.b, c0.a],
                 [c1.r, c1.g, c1.b, c1.a],

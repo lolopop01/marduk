@@ -37,6 +37,7 @@ impl FontSystem {
     ///
     /// Returns `(width, height)` in logical pixels. Used by the UI layer for
     /// layout without needing direct access to `fontdue::Font`.
+    #[must_use]
     pub fn measure_text(&self, text: &str, id: FontId, size: f32, max_width: Option<f32>) -> Vec2 {
         use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
 

@@ -252,6 +252,27 @@ impl Row {
         (available - self.padding.v()).max(0.0)
     }
 
+    /// Expand spacer children (zero natural size) to fill any leftover width.
+    ///
+    /// A "spacer" is a child that measured to `(0, 0)` — conventionally a
+    /// zero-sized element used to push siblings apart. The leftover space is
+    /// split evenly among all spacers in the row.
+    fn distribute_spacers(sizes: &mut [Vec2], available_w: f32, item_count: usize, spacing: f32) {
+        let spacer_count = sizes.iter().filter(|s| s.x == 0.0 && s.y == 0.0).count();
+        if spacer_count == 0 {
+            return;
+        }
+        let fixed_w: f32  = sizes.iter().map(|s| s.x).sum();
+        let spacing_total = (item_count.saturating_sub(1)) as f32 * spacing;
+        let remaining     = (available_w - fixed_w - spacing_total).max(0.0);
+        let spacer_w      = remaining / spacer_count as f32;
+        for s in sizes.iter_mut() {
+            if s.x == 0.0 && s.y == 0.0 {
+                s.x = spacer_w;
+            }
+        }
+    }
+
     fn child_constraints(&self, inner_h: f32) -> Constraints {
         match self.cross_align {
             Align::Stretch => {
@@ -325,20 +346,8 @@ impl Widget for Row {
 
         // First pass: natural sizes.
         let mut sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, &ctx)).collect();
-
-        // Distribute remaining width to zero-sized spacer children.
-        let spacer_count = sizes.iter().filter(|s| s.x == 0.0 && s.y == 0.0).count();
-        if spacer_count > 0 {
-            let fixed_w: f32  = sizes.iter().map(|s| s.x).sum();
-            let spacing_total = (self.children.len().saturating_sub(1)) as f32 * self.spacing;
-            let remaining     = (inner.size.x - fixed_w - spacing_total).max(0.0);
-            let spacer_w      = remaining / spacer_count as f32;
-            for s in sizes.iter_mut() {
-                if s.x == 0.0 && s.y == 0.0 {
-                    s.x = spacer_w;
-                }
-            }
-        }
+        // Expand spacer children to fill remaining horizontal space.
+        Self::distribute_spacers(&mut sizes, inner.size.x, self.children.len(), self.spacing);
 
         let mut x = inner.origin.x;
         for (i, (child, s)) in self.children.iter().zip(sizes.iter()).enumerate() {
@@ -358,22 +367,9 @@ impl Widget for Row {
         let spacing     = self.spacing;
         let n           = self.children.len();
 
-        // Measure pass (immutable) to get each child's size.
+        // Measure pass (immutable) to get each child's size, then expand spacers.
         let mut sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, ctx)).collect();
-
-        // Distribute remaining width to spacer (zero-sized) children.
-        let spacer_count = sizes.iter().filter(|s| s.x == 0.0 && s.y == 0.0).count();
-        if spacer_count > 0 {
-            let fixed_w: f32  = sizes.iter().map(|s| s.x).sum();
-            let spacing_total = (n.saturating_sub(1)) as f32 * spacing;
-            let remaining     = (inner.size.x - fixed_w - spacing_total).max(0.0);
-            let spacer_w      = remaining / spacer_count as f32;
-            for s in sizes.iter_mut() {
-                if s.x == 0.0 && s.y == 0.0 {
-                    s.x = spacer_w;
-                }
-            }
-        }
+        Self::distribute_spacers(&mut sizes, inner.size.x, n, spacing);
 
         // Event-routing pass (mutable).
         let mut x = inner.origin.x;

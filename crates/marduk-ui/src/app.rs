@@ -354,15 +354,15 @@ impl EngineApp for UiAppState {
         };
 
         // ── Layout + paint ────────────────────────────────────────────────
+        // The returned &mut DrawList is not captured here; we access it below
+        // via self.ui_scene.draw_list so the borrow is released before render.
         match (&self.doc, &mut self.root) {
             (Some(doc), _) => {
-                // DSL mode: rebuild widget tree each frame.
                 let root = self.loader.build(doc, &self.bindings);
-                self.ui_scene.frame(root, viewport, &ui_input);
+                let _ = self.ui_scene.frame(root, viewport, &ui_input);
             }
             (None, Some(root)) => {
-                // Widget mode: borrow existing root each frame.
-                self.ui_scene.frame_ref(root, viewport, &ui_input);
+                let _ = self.ui_scene.frame_ref(root, viewport, &ui_input);
             }
             _ => {}
         }

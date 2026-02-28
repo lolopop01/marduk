@@ -10,7 +10,7 @@ use winit::window::{Window, WindowId};
 
 use crate::core::{App as CoreApp, AppControl, FrameCtx, WindowCtx};
 use crate::device::{Gpu, GpuInit};
-use crate::input::{InputFrame, InputState};
+use crate::input::{InputEvent, InputFrame, InputState};
 use crate::input::platform::winit as input_winit;
 use crate::time::FrameClock;
 
@@ -224,15 +224,11 @@ where
             return;
         }
 
+        // Sleep until the next OS event (mouse move, key press, resize, …).
+        // Redraws are requested explicitly: once on window creation, and again
+        // on Resized / ScaleFactorChanged. This keeps CPU/GPU usage near zero
+        // while the window is idle.
         event_loop.set_control_flow(ControlFlow::Wait);
-
-        // Bootstrap behavior: continuous redraw.
-        // Later: invalidation-based redraw from UI.
-        for entry in self.windows.values() {
-            entry.with_window(|w| {
-                w.request_redraw();
-            });
-        }
     }
 
     fn window_event(
@@ -255,9 +251,24 @@ where
 
         // Exit intent is latched locally, then applied outside the closure.
         let mut exit_from_app_event = false;
+        // True when input events that could cause a visual change were received.
+        // ModifiersChanged and Focused update internal state but don't affect
+        // the widget tree's appearance, so they are excluded.
+        let mut had_visual_input = false;
 
         entry.with_mut(|fields| {
-            for ev in input_winit::translate_window_event(fields.window, fields.input_state, &event) {
+            let events = input_winit::translate_window_event(fields.window, fields.input_state, &event);
+            for ev in &events {
+                had_visual_input |= matches!(ev,
+                    InputEvent::PointerMoved(_)
+                    | InputEvent::PointerLeft
+                    | InputEvent::PointerButton(_)
+                    | InputEvent::MouseWheel { .. }
+                    | InputEvent::Key { .. }
+                    | InputEvent::Text(_)
+                );
+            }
+            for ev in events {
                 fields.input_state.apply_event(fields.input_frame, ev);
             }
 
@@ -325,7 +336,22 @@ where
                             app_control = self.app.on_frame(&mut ctx);
                         }
 
+                        // Keep the compositor frame-callback chain alive while the user
+                        // is actively interacting (input arrived this frame, or a button/
+                        // key is still held). This avoids Wayland latency: without it, the
+                        // compositor stops sending frame callbacks when the window is idle,
+                        // and the next `request_redraw()` must wait up to one vsync period
+                        // before `RedrawRequested` is delivered. PresentMode::Fifo caps the
+                        // actual render rate at the monitor refresh rate.
+                        let had_activity = !fields.input_frame.events.is_empty()
+                            || !fields.input_state.buttons_down.is_empty()
+                            || !fields.input_state.keys_down.is_empty();
+
                         fields.input_frame.clear();
+
+                        if had_activity {
+                            fields.window.request_redraw();
+                        }
                     });
                 }
 
@@ -336,7 +362,16 @@ where
                 self.apply_commands(event_loop, runtime_ctx);
             }
 
-            _ => {}
+            _ => {
+                // Any event that visually changes the UI (cursor move, click,
+                // scroll, key, text) needs a repaint. Modifier/focus changes
+                // are filtered out by the `had_visual_input` flag above.
+                if had_visual_input {
+                    if let Some(entry) = self.windows.get(&window_id) {
+                        entry.with_window(|w| w.request_redraw());
+                    }
+                }
+            }
         }
 
         if self.exit_requested {

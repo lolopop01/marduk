@@ -81,6 +81,7 @@ impl UiScene {
     /// Use this when the root widget holds state that must persist across frames
     /// (e.g. selection, scroll position). The widget is kept alive in the caller
     /// and updated via `on_event` each frame.
+    #[must_use]
     pub fn frame_ref(
         &mut self,
         root: &mut Element,
@@ -89,8 +90,8 @@ impl UiScene {
     ) -> &mut DrawList {
         self.draw_list.clear();
         let ctx = LayoutCtx { fonts: &self.font_system };
-        // Measure so children know their sizes, but always fill the full viewport.
-        root.measure(Constraints::loose(viewport), &ctx);
+        // Pre-pass: let children compute their natural sizes.
+        let _ = root.measure(Constraints::loose(viewport), &ctx);
         let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
         {
             let mut painter = Painter::new(
@@ -137,6 +138,7 @@ impl UiScene {
         self.frame(root.into(), viewport, input)
     }
 
+    #[must_use]
     pub fn frame(
         &mut self,
         mut root: Element,
@@ -147,8 +149,9 @@ impl UiScene {
 
         // ── measure ───────────────────────────────────────────────────────
         let ctx = LayoutCtx { fonts: &self.font_system };
-        // Measure so children know their sizes, but always fill the full viewport.
-        root.measure(Constraints::loose(viewport), &ctx);
+        // Pre-pass: let children compute their natural sizes. The root itself
+        // always occupies the full viewport, so its measured size is unused.
+        let _ = root.measure(Constraints::loose(viewport), &ctx);
         let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
 
         // ── paint ─────────────────────────────────────────────────────────

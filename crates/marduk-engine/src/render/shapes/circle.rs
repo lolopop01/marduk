@@ -5,8 +5,8 @@ use crate::render::{RenderCtx, RenderTarget};
 use crate::scene::{DrawCmd, DrawList};
 
 use super::common::{
-    logical_clip_to_scissor, premul_alpha_blend, resolve_paint, QuadVertex, ViewportUniform,
-    QUAD_INDICES, QUAD_VERTICES,
+    logical_clip_to_scissor, premul_alpha_blend, resolve_paint, viewport_ubo_min_binding_size,
+    QuadVertex, ViewportUniform, QUAD_INDICES, QUAD_VERTICES,
 };
 
 /// Renderer for `DrawCmd::Circle`.
@@ -157,12 +157,7 @@ impl CircleRenderer {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: Some(
-                            std::num::NonZeroU64::new(
-                                std::mem::size_of::<ViewportUniform>() as u64,
-                            )
-                            .unwrap(),
-                        ),
+                        min_binding_size: Some(viewport_ubo_min_binding_size()),
                     },
                     count: None,
                 }],

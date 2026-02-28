@@ -79,6 +79,7 @@ impl Constraints {
 
     /// Clamp a size into `[min, max]`.
     #[inline]
+    #[must_use]
     pub fn constrain(self, size: Vec2) -> Vec2 {
         Vec2::new(
             size.x.max(self.min.x).min(self.max.x),
@@ -88,6 +89,7 @@ impl Constraints {
 
     /// Shrink max inward by `edges` (for padding). Min becomes zero.
     #[inline]
+    #[must_use]
     pub fn shrink(self, edges: Edges) -> Self {
         Self {
             min: Vec2::zero(),
@@ -132,4 +134,93 @@ pub fn inset_rect(rect: Rect, edges: Edges) -> Rect {
         (rect.size.x - edges.h()).max(0.0),
         (rect.size.y - edges.v()).max(0.0),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use marduk_engine::coords::Rect;
+
+    // ── Constraints::constrain ────────────────────────────────────────────
+
+    #[test]
+    fn constrain_clamps_below_min() {
+        let c = Constraints { min: Vec2::new(10.0, 10.0), max: Vec2::new(100.0, 100.0) };
+        let out = c.constrain(Vec2::new(5.0, 3.0));
+        assert_eq!(out.x, 10.0);
+        assert_eq!(out.y, 10.0);
+    }
+
+    #[test]
+    fn constrain_clamps_above_max() {
+        let c = Constraints::loose(Vec2::new(50.0, 50.0));
+        let out = c.constrain(Vec2::new(200.0, 200.0));
+        assert_eq!(out.x, 50.0);
+        assert_eq!(out.y, 50.0);
+    }
+
+    #[test]
+    fn constrain_inside_range_unchanged() {
+        let c = Constraints { min: Vec2::new(5.0, 5.0), max: Vec2::new(50.0, 50.0) };
+        let v = Vec2::new(20.0, 30.0);
+        assert_eq!(c.constrain(v), v);
+    }
+
+    // ── Constraints::shrink ───────────────────────────────────────────────
+
+    #[test]
+    fn shrink_reduces_max() {
+        let c = Constraints::loose(Vec2::new(100.0, 80.0));
+        let s = c.shrink(Edges::all(10.0));
+        assert_eq!(s.max.x, 80.0);
+        assert_eq!(s.max.y, 60.0);
+    }
+
+    #[test]
+    fn shrink_clamps_to_zero() {
+        let c = Constraints::loose(Vec2::new(5.0, 5.0));
+        let s = c.shrink(Edges::all(20.0));
+        assert_eq!(s.max.x, 0.0);
+        assert_eq!(s.max.y, 0.0);
+    }
+
+    // ── inset_rect ────────────────────────────────────────────────────────
+
+    #[test]
+    fn inset_rect_uniform_padding() {
+        let rect = Rect::new(0.0, 0.0, 100.0, 80.0);
+        let inner = inset_rect(rect, Edges::all(10.0));
+        assert_eq!(inner.origin.x, 10.0);
+        assert_eq!(inner.origin.y, 10.0);
+        assert_eq!(inner.size.x, 80.0);
+        assert_eq!(inner.size.y, 60.0);
+    }
+
+    #[test]
+    fn inset_rect_asymmetric_padding() {
+        let rect = Rect::new(5.0, 5.0, 100.0, 60.0);
+        let edges = Edges { top: 4.0, bottom: 8.0, left: 6.0, right: 10.0 };
+        let inner = inset_rect(rect, edges);
+        assert_eq!(inner.origin.x, 11.0); // 5 + 6
+        assert_eq!(inner.origin.y, 9.0);  // 5 + 4
+        assert_eq!(inner.size.x, 84.0);   // 100 - 6 - 10
+        assert_eq!(inner.size.y, 48.0);   // 60 - 4 - 8
+    }
+
+    #[test]
+    fn inset_rect_clamps_to_zero() {
+        let rect = Rect::new(0.0, 0.0, 10.0, 10.0);
+        let inner = inset_rect(rect, Edges::all(20.0));
+        assert_eq!(inner.size.x, 0.0);
+        assert_eq!(inner.size.y, 0.0);
+    }
+
+    // ── Edges helpers ─────────────────────────────────────────────────────
+
+    #[test]
+    fn edges_h_and_v() {
+        let e = Edges::symmetric(4.0, 8.0);
+        assert_eq!(e.h(), 16.0); // left + right
+        assert_eq!(e.v(), 8.0);  // top + bottom
+    }
 }

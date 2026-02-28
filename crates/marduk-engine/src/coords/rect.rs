@@ -91,3 +91,103 @@ impl Rect {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn r(x: f32, y: f32, w: f32, h: f32) -> Rect { Rect::new(x, y, w, h) }
+
+    // ── normalized ────────────────────────────────────────────────────────
+
+    #[test]
+    fn normalized_positive_is_identity() {
+        let rect = r(1.0, 2.0, 10.0, 20.0);
+        assert_eq!(rect.normalized(), rect);
+    }
+
+    #[test]
+    fn normalized_negative_width() {
+        let rect = r(10.0, 0.0, -4.0, 5.0);
+        let n = rect.normalized();
+        assert_eq!(n.origin.x, 6.0);
+        assert_eq!(n.size.x, 4.0);
+    }
+
+    #[test]
+    fn normalized_negative_height() {
+        let rect = r(0.0, 10.0, 5.0, -3.0);
+        let n = rect.normalized();
+        assert_eq!(n.origin.y, 7.0);
+        assert_eq!(n.size.y, 3.0);
+    }
+
+    // ── contains ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn contains_interior_point() {
+        assert!(r(0.0, 0.0, 10.0, 10.0).contains(Vec2::new(5.0, 5.0)));
+    }
+
+    #[test]
+    fn contains_top_left_inclusive() {
+        assert!(r(0.0, 0.0, 10.0, 10.0).contains(Vec2::new(0.0, 0.0)));
+    }
+
+    #[test]
+    fn contains_bottom_right_exclusive() {
+        // Half-open [min, max) — the max edge is not contained.
+        assert!(!r(0.0, 0.0, 10.0, 10.0).contains(Vec2::new(10.0, 10.0)));
+    }
+
+    #[test]
+    fn contains_outside() {
+        assert!(!r(0.0, 0.0, 10.0, 10.0).contains(Vec2::new(-1.0, 5.0)));
+        assert!(!r(0.0, 0.0, 10.0, 10.0).contains(Vec2::new(5.0, -1.0)));
+    }
+
+    // ── intersect ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn intersect_overlapping() {
+        let a = r(0.0, 0.0, 10.0, 10.0);
+        let b = r(5.0, 5.0, 10.0, 10.0);
+        let i = a.intersect(b).unwrap();
+        assert_eq!(i, r(5.0, 5.0, 5.0, 5.0));
+    }
+
+    #[test]
+    fn intersect_contained() {
+        let outer = r(0.0, 0.0, 100.0, 100.0);
+        let inner = r(10.0, 10.0, 20.0, 20.0);
+        assert_eq!(outer.intersect(inner).unwrap(), inner);
+    }
+
+    #[test]
+    fn intersect_touching_edge_returns_none() {
+        // Rects share an edge — zero-width overlap is not a valid intersection.
+        let a = r(0.0, 0.0, 10.0, 10.0);
+        let b = r(10.0, 0.0, 10.0, 10.0);
+        assert!(a.intersect(b).is_none());
+    }
+
+    #[test]
+    fn intersect_disjoint_returns_none() {
+        let a = r(0.0, 0.0, 5.0, 5.0);
+        let b = r(20.0, 20.0, 5.0, 5.0);
+        assert!(a.intersect(b).is_none());
+    }
+
+    // ── is_empty ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn is_empty_zero_size() {
+        assert!(r(0.0, 0.0, 0.0, 5.0).is_empty());
+        assert!(r(0.0, 0.0, 5.0, 0.0).is_empty());
+    }
+
+    #[test]
+    fn is_empty_positive_size() {
+        assert!(!r(0.0, 0.0, 1.0, 1.0).is_empty());
+    }
+}

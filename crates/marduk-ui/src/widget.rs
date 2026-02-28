@@ -34,6 +34,7 @@ pub trait Widget: 'static {
     ///
     /// Must be deterministic — calling `measure` twice with the same arguments
     /// must return the same result. The parent may call `measure` multiple times.
+    #[must_use]
     fn measure(&self, constraints: Constraints, ctx: &LayoutCtx) -> Vec2;
 
     /// Draw this widget into `painter` within the bounds of `rect`.
@@ -73,6 +74,7 @@ impl Element {
     }
 
     #[inline]
+    #[must_use]
     pub fn measure(&self, constraints: Constraints, ctx: &LayoutCtx) -> Vec2 {
         self.0.measure(constraints, ctx)
     }

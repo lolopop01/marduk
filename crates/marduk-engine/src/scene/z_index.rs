@@ -4,7 +4,11 @@ use core::cmp::Ordering;
 ///
 /// Higher values appear on top of lower values.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default)]
-pub struct ZIndex(pub i32);
+pub struct ZIndex(
+    /// The raw z-value. Use negative values for backgrounds, 0 for normal
+    /// content, and positive values for overlays/tooltips.
+    pub i32,
+);
 
 impl ZIndex {
     #[inline]

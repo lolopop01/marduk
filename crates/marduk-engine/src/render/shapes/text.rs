@@ -9,8 +9,8 @@ use crate::scene::{DrawCmd, DrawList};
 use crate::text::FontSystem;
 
 use super::common::{
-    logical_clip_to_scissor, premul_alpha_blend, QuadVertex, ViewportUniform, QUAD_INDICES,
-    QUAD_VERTICES,
+    logical_clip_to_scissor, premul_alpha_blend, viewport_ubo_min_binding_size, QuadVertex,
+    ViewportUniform, QUAD_INDICES, QUAD_VERTICES,
 };
 
 // ── atlas constants ────────────────────────────────────────────────────────
@@ -330,12 +330,7 @@ impl TextRenderer {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: Some(
-                            std::num::NonZeroU64::new(
-                                std::mem::size_of::<ViewportUniform>() as u64,
-                            )
-                            .unwrap(),
-                        ),
+                        min_binding_size: Some(viewport_ubo_min_binding_size()),
                     },
                     count: None,
                 },

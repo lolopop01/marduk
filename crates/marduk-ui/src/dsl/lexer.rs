@@ -131,10 +131,16 @@ impl<'s> Lexer<'s> {
             )));
         }
         let hex = &self.src[start..self.pos];
-        let r = u8::from_str_radix(&hex[0..2], 16).unwrap();
-        let g = u8::from_str_radix(&hex[2..4], 16).unwrap();
-        let b = u8::from_str_radix(&hex[4..6], 16).unwrap();
-        let a = if count == 8 { u8::from_str_radix(&hex[6..8], 16).unwrap() } else { 255 };
+        // All characters were validated as ascii_hexdigit above, and 2 hex
+        // digits fit in u8 (max 0xFF = 255), so these conversions never fail.
+        let r = u8::from_str_radix(&hex[0..2], 16).expect("validated hex digits");
+        let g = u8::from_str_radix(&hex[2..4], 16).expect("validated hex digits");
+        let b = u8::from_str_radix(&hex[4..6], 16).expect("validated hex digits");
+        let a = if count == 8 {
+            u8::from_str_radix(&hex[6..8], 16).expect("validated hex digits")
+        } else {
+            255
+        };
         let color = Color::from_straight(
             r as f32 / 255.0,
             g as f32 / 255.0,

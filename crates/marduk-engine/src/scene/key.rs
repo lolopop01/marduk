@@ -9,7 +9,9 @@ use super::ZIndex;
 /// 2) `order`: ascending (insertion order for equal z)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SortKey {
+    /// Z-layer. Lower values are drawn first (further back).
     pub z: ZIndex,
+    /// Insertion index within the same z-layer, ensuring stable ordering.
     pub order: u32,
 }
 
