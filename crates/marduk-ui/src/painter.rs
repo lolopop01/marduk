@@ -76,7 +76,7 @@ impl<'a> Painter<'a> {
     /// its children to compute their layout positions.
     #[inline]
     pub fn layout_ctx(&self) -> LayoutCtx<'_> {
-        LayoutCtx { fonts: self.font_system }
+        LayoutCtx { fonts: self.font_system, scale: self.scale }
     }
 
     // ── drawing ───────────────────────────────────────────────────────────

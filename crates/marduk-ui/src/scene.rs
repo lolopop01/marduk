@@ -102,7 +102,7 @@ impl UiScene {
         input: &UiInput,
     ) -> &mut DrawList {
         self.draw_list.clear();
-        let ctx = LayoutCtx { fonts: &self.font_system };
+        let ctx = LayoutCtx { fonts: &self.font_system, scale: self.pixel_ratio };
         // Pre-pass: let children compute their natural sizes.
         let _ = root.measure(Constraints::loose(viewport), &ctx);
         let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
@@ -117,7 +117,7 @@ impl UiScene {
             root.paint(&mut painter, rect);
         }
         {
-            let ctx = LayoutCtx { fonts: &self.font_system };
+            let ctx = LayoutCtx { fonts: &self.font_system, scale: self.pixel_ratio };
             root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
             if let Some(start) = input.drag_origin {
                 root.on_event(&UiEvent::Drag { pos: input.mouse_pos, start }, rect, &ctx);
@@ -168,7 +168,7 @@ impl UiScene {
         self.draw_list.clear();
 
         // ── measure ───────────────────────────────────────────────────────
-        let ctx = LayoutCtx { fonts: &self.font_system };
+        let ctx = LayoutCtx { fonts: &self.font_system, scale: self.pixel_ratio };
         // Pre-pass: let children compute their natural sizes. The root itself
         // always occupies the full viewport, so its measured size is unused.
         let _ = root.measure(Constraints::loose(viewport), &ctx);
@@ -188,7 +188,7 @@ impl UiScene {
 
         // ── events ────────────────────────────────────────────────────────
         {
-            let ctx = LayoutCtx { fonts: &self.font_system };
+            let ctx = LayoutCtx { fonts: &self.font_system, scale: self.pixel_ratio };
             root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
             if let Some(start) = input.drag_origin {
                 root.on_event(&UiEvent::Drag { pos: input.mouse_pos, start }, rect, &ctx);

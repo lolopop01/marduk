@@ -166,7 +166,7 @@ impl TextRenderer {
             self.layout.reset(&LayoutSettings {
                 x: (cmd.origin.x * raster_scale).round(),
                 y: (cmd.origin.y * raster_scale).round(),
-                max_width: cmd.max_width.map(|w| (w * raster_scale).round()),
+                max_width: cmd.max_width.map(|w| (w * raster_scale).ceil()),
                 ..LayoutSettings::default()
             });
             self.layout.append(&[font], &TextStyle::new(&cmd.text, cmd.size * raster_scale, 0));

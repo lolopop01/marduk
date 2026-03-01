@@ -106,7 +106,7 @@ impl Default for RadioGroup { fn default() -> Self { Self::new() } }
 impl Widget for RadioGroup {
     fn measure(&self, constraints: Constraints, ctx: &LayoutCtx) -> Vec2 {
         let max_label_w = self.options.iter().fold(0.0f32, |acc, opt| {
-            let w = self.font.map(|f| ctx.fonts.measure_text(&opt.label, f, self.font_size, None).x)
+            let w = self.font.map(|f| ctx.fonts.measure_text_scaled(&opt.label, f, self.font_size, None, ctx.scale).x)
                 .unwrap_or(0.0);
             acc.max(w)
         });

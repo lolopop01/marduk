@@ -74,7 +74,7 @@ impl Default for Checkbox { fn default() -> Self { Self::new() } }
 impl Widget for Checkbox {
     fn measure(&self, constraints: Constraints, ctx: &LayoutCtx) -> Vec2 {
         let text_size = if !self.label.is_empty() {
-            self.font.map(|f| ctx.fonts.measure_text(&self.label, f, self.font_size, None))
+            self.font.map(|f| ctx.fonts.measure_text_scaled(&self.label, f, self.font_size, None, ctx.scale))
                 .unwrap_or(Vec2::zero())
         } else {
             Vec2::zero()

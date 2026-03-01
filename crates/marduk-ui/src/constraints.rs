@@ -121,6 +121,10 @@ impl Constraints {
 /// owning the `FontSystem`.
 pub struct LayoutCtx<'a> {
     pub fonts: &'a FontSystem,
+    /// Physical-to-logical pixel ratio (os_scale × zoom), matching the text
+    /// renderer's `raster_scale`.  Pass this to `fonts.measure_text_scaled` so
+    /// that measured widths exactly match what the renderer will draw.
+    pub scale: f32,
 }
 
 // ── rect helper ──────────────────────────────────────────────────────────

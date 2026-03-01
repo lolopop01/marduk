@@ -37,7 +37,7 @@ impl Text {
 impl Widget for Text {
     fn measure(&self, constraints: Constraints, ctx: &LayoutCtx) -> Vec2 {
         let max_w = if constraints.max.x.is_finite() { Some(constraints.max.x) } else { None };
-        let size = ctx.fonts.measure_text(&self.text, self.font, self.size, max_w);
+        let size = ctx.fonts.measure_text_scaled(&self.text, self.font, self.size, max_w, ctx.scale);
         constraints.constrain(size)
     }
 

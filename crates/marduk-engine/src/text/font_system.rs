@@ -78,7 +78,15 @@ impl FontSystem {
             return Vec2::new(0.0, size * 1.2);
         }
 
-        let w = glyphs.iter().map(|g| g.x + g.width as f32).fold(0.0f32, f32::max) / scale;
+        // Use the pen position *after* each glyph (= g.x - xmin + advance_width) rather
+        // than the bitmap right edge (= g.x + g.width).  Fontdue's wrap check is:
+        //   (pen_before - settings.x) + advance_width > max_width
+        // so max_width must be >= the advance extent to avoid spurious wrapping in the
+        // renderer when the measured width is later used as the paint max_width.
+        let w = glyphs.iter().map(|g| {
+            let m = font.metrics_indexed(g.key.glyph_index, phys_size);
+            (g.x - m.xmin as f32 + m.advance_width).max(0.0)
+        }).fold(0.0f32, f32::max) / scale;
         let h = glyphs.iter().map(|g| g.y + g.height as f32).fold(phys_size, f32::max) / scale;
         Vec2::new(w, h)
     }
