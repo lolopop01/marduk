@@ -240,19 +240,6 @@ where
         }
     }
 
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        if self.exit_requested {
-            event_loop.exit();
-            return;
-        }
-
-        // Sleep until the next OS event (mouse move, key press, resize, …).
-        // Redraws are requested explicitly: once on window creation, and again
-        // on Resized / ScaleFactorChanged. This keeps CPU/GPU usage near zero
-        // while the window is idle.
-        event_loop.set_control_flow(ControlFlow::Wait);
-    }
-
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -401,5 +388,18 @@ where
         if self.exit_requested {
             event_loop.exit();
         }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.exit_requested {
+            event_loop.exit();
+            return;
+        }
+
+        // Sleep until the next OS event (mouse move, key press, resize, …).
+        // Redraws are requested explicitly: once on window creation, and again
+        // on Resized / ScaleFactorChanged. This keeps CPU/GPU usage near zero
+        // while the window is idle.
+        event_loop.set_control_flow(ControlFlow::Wait);
     }
 }

@@ -1,6 +1,8 @@
 use marduk_engine::coords::Vec2;
 use marduk_engine::input::Key;
 
+pub use marduk_engine::input::Modifiers;
+
 /// Input events routed through the widget tree.
 #[derive(Debug, Clone)]
 pub enum UiEvent {
@@ -14,7 +16,7 @@ pub enum UiEvent {
     /// Committed text input (one or more characters).
     TextInput { text: String },
     /// Named key pressed (Backspace, Enter, arrow keys, …).
-    KeyPress { key: Key },
+    KeyPress { key: Key, modifiers: Modifiers },
     /// Mouse wheel / trackpad scroll.
     ///
     /// `delta` > 0 → scroll down (reveal content below); < 0 → scroll up.

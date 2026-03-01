@@ -428,6 +428,7 @@ impl EngineApp for UiAppState {
             scroll_delta:  if ctrl { 0.0 } else { raw_scroll },
             drag_origin:   self.drag_origin,
             drag_end,
+            modifiers:     ctx.input.modifiers,
         };
 
         // ── Sync pixel_ratio for accurate text measurement ────────────────

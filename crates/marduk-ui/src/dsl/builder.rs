@@ -71,15 +71,19 @@ pub struct DslBindings {
     pub widget_state: Rc<RefCell<HashMap<String, WidgetStateValue>>>,
     /// State key of the currently focused TextBox, if any.
     pub focused_widget: Rc<RefCell<Option<String>>>,
+    /// Persisted cursor/anchor/scroll state for TextBox widgets.
+    /// Keyed by `state_key`; value is `(cursor_byte, anchor_byte, scroll_offset)`.
+    pub text_edit_states: Rc<RefCell<HashMap<String, (usize, usize, f32)>>>,
 }
 
 impl DslBindings {
     pub fn new() -> Self {
         Self {
-            fonts: HashMap::new(),
-            event_queue: Rc::new(RefCell::new(Vec::new())),
-            widget_state: Rc::new(RefCell::new(HashMap::new())),
-            focused_widget: Rc::new(RefCell::new(None)),
+            fonts:            HashMap::new(),
+            event_queue:      Rc::new(RefCell::new(Vec::new())),
+            widget_state:     Rc::new(RefCell::new(HashMap::new())),
+            focused_widget:   Rc::new(RefCell::new(None)),
+            text_edit_states: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -89,10 +93,11 @@ impl DslBindings {
     /// `on_event_state` share the same map as the DSL widget tree.
     pub fn with_state(widget_state: Rc<RefCell<HashMap<String, WidgetStateValue>>>) -> Self {
         Self {
-            fonts: HashMap::new(),
-            event_queue: Rc::new(RefCell::new(Vec::new())),
+            fonts:            HashMap::new(),
+            event_queue:      Rc::new(RefCell::new(Vec::new())),
             widget_state,
-            focused_widget: Rc::new(RefCell::new(None)),
+            focused_widget:   Rc::new(RefCell::new(None)),
+            text_edit_states: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -543,7 +548,17 @@ impl DslLoader {
             .map(|k| bindings.focused_widget.borrow().as_deref() == Some(k))
             .unwrap_or(false);
 
-        let mut tb = TextBox::new().text(text).focused(focused);
+        // Restore cursor/anchor/scroll from previous frame (if any).
+        let (cursor, anchor, scroll) = state_key.as_deref()
+            .and_then(|k| bindings.text_edit_states.borrow().get(k).copied())
+            .unwrap_or_else(|| (text.len(), text.len(), 0.0));
+
+        let mut tb = TextBox::new()
+            .text(text)
+            .cursor(cursor)
+            .anchor(anchor)
+            .scroll_offset(scroll)
+            .focused(focused);
 
         if let Some(font) = self.resolve_font(node, bindings) { tb = tb.font(font); }
         if let Some(v) = node.prop_f32("font_size")               { tb = tb.font_size(v); }
@@ -561,6 +576,15 @@ impl DslLoader {
         if let Some(v) = node.prop_f32("padding")                 { tb = tb.padding_all(v); }
         if let Some(placeholder) = node.prop_str("placeholder")   {
             tb = tb.placeholder(placeholder.to_string());
+        }
+
+        // on_cursor_change: persist cursor/anchor/scroll state across frame rebuilds
+        if let Some(key) = state_key.clone() {
+            let slot = Rc::clone(&bindings.text_edit_states);
+            let k = key.clone();
+            tb = tb.on_cursor_change(move |cursor, anchor, scroll| {
+                slot.borrow_mut().insert(k.clone(), (cursor, anchor, scroll));
+            });
         }
 
         // on_focus: mark this widget as focused in bindings

@@ -10,3 +10,4 @@ marduk-mkml   = { path = "../marduk-mkml" }
 # Not exposed in the public API — user code never imports winit.
 winit = "0.30.12"
 log = "0.4"
+arboard = "3"

@@ -1,5 +1,5 @@
 use marduk_engine::coords::{Rect, Vec2};
-use marduk_engine::input::Key;
+use marduk_engine::input::{Key, Modifiers};
 use marduk_engine::scene::DrawList;
 use marduk_engine::text::{FontId, FontSystem};
 
@@ -27,6 +27,8 @@ pub struct UiInput {
     pub keys_pressed: Vec<Key>,
     /// Accumulated scroll wheel delta this frame (positive = scroll down).
     pub scroll_delta: f32,
+    /// Modifier keys currently held (Shift, Ctrl, Alt, Meta).
+    pub modifiers: Modifiers,
     /// Where the current mouse drag started (`None` when no drag is in progress).
     pub drag_origin: Option<Vec2>,
     /// Set to `Some(start)` for the single frame in which a drag ends (button released).
@@ -132,7 +134,7 @@ impl UiScene {
                 root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);
             }
             for key in &input.keys_pressed {
-                root.on_event(&UiEvent::KeyPress { key: *key }, rect, &ctx);
+                root.on_event(&UiEvent::KeyPress { key: *key, modifiers: input.modifiers }, rect, &ctx);
             }
             if input.scroll_delta != 0.0 {
                 root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta }, rect, &ctx);
@@ -203,7 +205,7 @@ impl UiScene {
                 root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);
             }
             for key in &input.keys_pressed {
-                root.on_event(&UiEvent::KeyPress { key: *key }, rect, &ctx);
+                root.on_event(&UiEvent::KeyPress { key: *key, modifiers: input.modifiers }, rect, &ctx);
             }
             if input.scroll_delta != 0.0 {
                 root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta }, rect, &ctx);

@@ -8,5 +8,6 @@ pub mod scroll;
 pub mod slider;
 pub mod stack;
 pub mod text;
+pub mod text_edit;
 pub mod textbox;
 pub mod toggle;

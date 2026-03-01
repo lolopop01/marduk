@@ -156,7 +156,7 @@ impl Widget for ScrollView {
                 EventResult::Consumed
             }
 
-            UiEvent::KeyPress { key } => {
+            UiEvent::KeyPress { key, .. } => {
                 // Route to child first — a focused TextBox should eat arrow keys.
                 let content_rect = self.content_rect(rect, content_h);
                 if self.child.on_event(event, content_rect, ctx) == EventResult::Consumed {
