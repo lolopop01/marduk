@@ -572,9 +572,10 @@ impl DslLoader {
         if let Some(v) = node.engine_color("focused_border_color").or_else(|| node.engine_color("accent")) {
             tb = tb.focused_border_color(v);
         }
-        if let Some(v) = node.prop_f32("corner_radius")           { tb = tb.corner_radius(v); }
-        if let Some(v) = node.prop_f32("padding")                 { tb = tb.padding_all(v); }
-        if let Some(placeholder) = node.prop_str("placeholder")   {
+        if let Some(v) = node.prop_f32("corner_radius")                 { tb = tb.corner_radius(v); }
+        if let Some(v) = node.prop_f32("padding")                       { tb = tb.padding_all(v); }
+        if let Some(v) = node.engine_color("selection_color")           { tb = tb.selection_color(v); }
+        if let Some(placeholder) = node.prop_str("placeholder")         {
             tb = tb.placeholder(placeholder.to_string());
         }
 

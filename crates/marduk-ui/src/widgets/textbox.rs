@@ -210,9 +210,11 @@ impl Widget for TextBox {
                     - scroll;
                 let sel_x  = inner.origin.x + x0;
                 let sel_w  = (x1 - x0).max(0.0);
-                painter.fill_rect(
+                painter.fill_rounded_rect(
                     Rect::new(sel_x, inner.origin.y, sel_w, inner.size.y),
-                    self.selection_color,
+                    0.0,
+                    Paint::Solid(self.selection_color),
+                    None,
                 );
             }
 
