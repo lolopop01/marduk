@@ -27,9 +27,29 @@ pub enum UiEvent {
     /// Unlike `Click`, this fires even when `pos` is outside the widget — use
     /// `rect.contains(start)` to check ownership of the drag.
     DragEnd { pos: Vec2, start: Vec2 },
+    /// Keyboard focus was received (Tab cycle or programmatic focus change).
+    FocusGained,
+    /// Keyboard focus was lost.
+    FocusLost,
 }
 
 /// Result returned by [`Widget::on_event`].
+///
+/// # Propagation rules
+///
+/// - **`Click`** and **`KeyPress`**: stop at the first widget that returns
+///   `Consumed`. Container widgets (`Column`, `Row`, `Stack`) break out of
+///   their child loop as soon as they see `Consumed`.
+///
+/// - **`Hover`**: intentionally visits every widget on every frame, regardless
+///   of the return value. A widget returning `Consumed` from a `Hover` event
+///   has no effect on routing.
+///
+/// - **`TextInput`**, **`ScrollWheel`**, **`Drag`**, **`DragEnd`**: stop on
+///   first `Consumed`, same as `Click`.
+///
+/// Widgets that consume an event should return `Consumed` only when they have
+/// fully handled it and siblings/parents should not react to it too.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventResult {
     /// Event was handled — stop routing to siblings / parents.

@@ -42,6 +42,7 @@
 
 pub mod app;
 pub mod constraints;
+pub mod focus;
 
 // Top-level re-exports for the common entry point — `use marduk_ui::Application`
 pub use app::Application;
@@ -56,6 +57,7 @@ pub mod widgets;
 /// Everything you need to build and extend UI — import this in your component files.
 pub mod prelude {
     pub use crate::constraints::{Constraints, Edges, LayoutCtx};
+    pub use crate::focus::{FocusId, FocusManager};
     pub use crate::event::{EventResult, UiEvent};
     pub use crate::painter::Painter;
     pub use crate::scene::{UiInput, UiScene};
@@ -71,6 +73,7 @@ pub mod prelude {
         slider::Slider,
         stack::{AnchorVal, SizeHint, Stack, StackItem},
         text::Text,
+        text_edit::TextEditState,
         textbox::TextBox,
         toggle::Toggle,
     };

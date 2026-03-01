@@ -1,5 +1,8 @@
+use marduk_engine::input::Key;
 use marduk_engine::text::{FontId, FontSystem};
 use marduk_engine::coords::Vec2;
+
+use crate::event::UiEvent;
 
 /// Reusable text-editing state (cursor, anchor, horizontal scroll).
 ///
@@ -150,6 +153,92 @@ impl TextEditState {
             }
         }
         false
+    }
+
+    // ── event handling ────────────────────────────────────────────────────
+
+    /// Handle keyboard text editing events.
+    ///
+    /// Processes `TextInput` and `KeyPress` events (navigation, clipboard).
+    /// Mouse/drag events are intentionally excluded — those need the widget rect
+    /// and should be handled by the containing widget.
+    ///
+    /// Returns `(consumed, text_changed)`:
+    /// - `consumed`: the event was handled; callers should return `EventResult::Consumed`.
+    /// - `text_changed`: the text content changed; callers should fire their `on_change` callback.
+    ///
+    /// After a call where `consumed` is true, call [`ensure_cursor_visible`] with
+    /// the available inner width to keep the cursor in view.
+    pub fn on_event(
+        &mut self,
+        event: &UiEvent,
+        _font: FontId,
+        _size: f32,
+        _fonts: &FontSystem,
+        _scale: f32,
+    ) -> (bool, bool) {
+        match event {
+            UiEvent::TextInput { text } => {
+                self.insert_str(text);
+                (true, true)
+            }
+
+            UiEvent::KeyPress { key, modifiers } => {
+                let shift = modifiers.shift;
+                let ctrl  = modifiers.ctrl;
+
+                match key {
+                    Key::Backspace => {
+                        self.delete_backward();
+                        (true, true)
+                    }
+                    Key::Delete => {
+                        self.delete_forward();
+                        (true, true)
+                    }
+                    Key::ArrowLeft => {
+                        if ctrl { self.move_word_left(shift); }
+                        else     { self.move_left(shift); }
+                        (true, false)
+                    }
+                    Key::ArrowRight => {
+                        if ctrl { self.move_word_right(shift); }
+                        else     { self.move_right(shift); }
+                        (true, false)
+                    }
+                    Key::Home => {
+                        self.move_home(shift);
+                        (true, false)
+                    }
+                    Key::End => {
+                        self.move_end(shift);
+                        (true, false)
+                    }
+                    Key::A if ctrl => {
+                        self.select_all();
+                        (true, false)
+                    }
+                    Key::C if ctrl => {
+                        self.copy();
+                        (true, false)
+                    }
+                    Key::X if ctrl => {
+                        let changed = self.cut();
+                        (true, changed)
+                    }
+                    Key::V if ctrl => {
+                        let changed = self.paste();
+                        (true, changed)
+                    }
+                    // Enter and Escape are intentionally NOT handled here — they have
+                    // widget-specific semantics (submit, defocus) that TextEditState
+                    // has no knowledge of.
+                    _ => (false, false),
+                }
+            }
+
+            _ => (false, false),
+        }
     }
 
     // ── measurement helpers ───────────────────────────────────────────────

@@ -1,4 +1,17 @@
+use std::fmt;
 use crate::coords::Vec2;
+
+/// Error returned by [`FontSystem::load_font`].
+#[derive(Debug, Clone)]
+pub struct FontLoadError(pub String);
+
+impl fmt::Display for FontLoadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "font load error: {}", self.0)
+    }
+}
+
+impl std::error::Error for FontLoadError {}
 
 /// Opaque handle to a font loaded into a [`FontSystem`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -21,8 +34,9 @@ impl FontSystem {
     /// Parses and stores a TrueType or OpenType font from raw bytes.
     ///
     /// Returns the `FontId` that identifies the font in draw commands.
-    pub fn load_font(&mut self, bytes: &[u8]) -> Result<FontId, &'static str> {
-        let font = fontdue::Font::from_bytes(bytes, fontdue::FontSettings::default())?;
+    pub fn load_font(&mut self, bytes: &[u8]) -> Result<FontId, FontLoadError> {
+        let font = fontdue::Font::from_bytes(bytes, fontdue::FontSettings::default())
+            .map_err(|e| FontLoadError(e.to_string()))?;
         let id = FontId(self.fonts.len());
         self.fonts.push(font);
         Ok(id)

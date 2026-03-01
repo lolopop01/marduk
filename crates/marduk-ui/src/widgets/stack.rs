@@ -226,7 +226,7 @@ impl Widget for Stack {
         // Copy the font reference and scale out so `painter` is free for child.paint() calls.
         let fonts = painter.font_system;
         let scale = painter.scale;
-        let ctx = LayoutCtx { fonts, scale };
+        let ctx = LayoutCtx { fonts, scale, focus: None };
 
         for item in &self.children {
             let child_rect = item.compute_rect(rect, &ctx);

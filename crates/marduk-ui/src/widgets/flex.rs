@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use marduk_engine::coords::{Rect, Vec2};
 
 use crate::constraints::{inset_rect, Constraints, Edges, LayoutCtx};
@@ -38,11 +39,23 @@ pub struct Column {
     spacing: f32,
     padding: Edges,
     cross_align: Align,
+    /// Per-frame layout cache: child sizes measured with the given constraints.
+    ///
+    /// Invalidated whenever `child_c` changes (window resize, parent constraint change).
+    /// Within a single frame the constraints are stable, so measure() is called once
+    /// instead of three times (measure, paint, on_event).
+    cached_sizes: RefCell<Option<(Constraints, Vec<Vec2>)>>,
 }
 
 impl Column {
     pub fn new() -> Self {
-        Self { children: Vec::new(), spacing: 0.0, padding: Edges::default(), cross_align: Align::Stretch }
+        Self {
+            children: Vec::new(),
+            spacing: 0.0,
+            padding: Edges::default(),
+            cross_align: Align::Stretch,
+            cached_sizes: RefCell::new(None),
+        }
     }
 
     pub fn spacing(mut self, v: f32) -> Self {
@@ -104,6 +117,23 @@ impl Column {
             Align::End => inner_origin_x + (inner_w - child_w),
         }
     }
+
+    /// Return (or compute and cache) child sizes for the given constraints.
+    ///
+    /// On cache hit (same `child_c` as last call), returns a clone of the
+    /// cached sizes — a cheap small-Vec clone. On miss, measures all children
+    /// and stores the result.
+    fn get_child_sizes(&self, child_c: Constraints, ctx: &LayoutCtx) -> Vec<Vec2> {
+        let mut cache = self.cached_sizes.borrow_mut();
+        if let Some((cached_c, ref sizes)) = *cache {
+            if cached_c == child_c {
+                return sizes.clone();
+            }
+        }
+        let sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, ctx)).collect();
+        *cache = Some((child_c, sizes.clone()));
+        sizes
+    }
 }
 
 impl Default for Column {
@@ -117,11 +147,12 @@ impl Widget for Column {
         let inner_w = self.inner_width(constraints.max.x);
         let child_c = self.child_constraints(inner_w);
 
+        let sizes = self.get_child_sizes(child_c, ctx);
+
         let mut total_h = self.padding.v();
         let mut max_child_w: f32 = 0.0;
 
-        for (i, child) in self.children.iter().enumerate() {
-            let s = child.measure(child_c, ctx);
+        for (i, s) in sizes.iter().enumerate() {
             total_h += s.y;
             if i + 1 < self.children.len() {
                 total_h += self.spacing;
@@ -149,14 +180,14 @@ impl Widget for Column {
         // letting us pass `painter` mutably to child.paint() in the loop.
         let fonts = painter.font_system;
         let scale = painter.scale;
-        let ctx = LayoutCtx { fonts, scale };
+        let ctx = LayoutCtx { fonts, scale, focus: None };
 
         let inner = inset_rect(rect, self.padding);
         let child_c = self.child_constraints(inner.size.x);
+        let sizes = self.get_child_sizes(child_c, &ctx);
 
         let mut y = inner.origin.y;
-        for (i, child) in self.children.iter().enumerate() {
-            let s = child.measure(child_c, &ctx);
+        for (i, (child, s)) in self.children.iter().zip(sizes.iter()).enumerate() {
             let x = self.child_x(inner.origin.x, inner.size.x, s.x);
             child.paint(painter, Rect::new(x, y, s.x, s.y));
             y += s.y;
@@ -173,9 +204,11 @@ impl Widget for Column {
         let spacing     = self.spacing;
         let n           = self.children.len();
 
+        // Use cached sizes (populated by measure/paint earlier this frame).
+        let sizes = self.get_child_sizes(child_c, ctx);
+
         let mut y = inner.origin.y;
-        for (i, child) in self.children.iter_mut().enumerate() {
-            let s = child.measure(child_c, ctx);
+        for (i, (child, s)) in self.children.iter_mut().zip(sizes.iter()).enumerate() {
             let x = match cross_align {
                 Align::Stretch | Align::Start => inner.origin.x,
                 Align::Center => inner.origin.x + (inner.size.x - s.x) * 0.5,
@@ -210,11 +243,22 @@ pub struct Row {
     spacing: f32,
     padding: Edges,
     cross_align: Align,
+    /// Per-frame layout cache: post-spacer child sizes for the given constraints.
+    ///
+    /// Stores the result AFTER `distribute_spacers` so both paint and on_event
+    /// see the same expanded widths.
+    cached_sizes: RefCell<Option<(Constraints, Vec<Vec2>)>>,
 }
 
 impl Row {
     pub fn new() -> Self {
-        Self { children: Vec::new(), spacing: 0.0, padding: Edges::default(), cross_align: Align::Stretch }
+        Self {
+            children: Vec::new(),
+            spacing: 0.0,
+            padding: Edges::default(),
+            cross_align: Align::Stretch,
+            cached_sizes: RefCell::new(None),
+        }
     }
 
     pub fn spacing(mut self, v: f32) -> Self {
@@ -297,6 +341,24 @@ impl Row {
             Align::End => inner_origin_y + (inner_h - child_h),
         }
     }
+
+    /// Return (or compute-and-cache) the post-spacer child sizes for the given
+    /// child constraints and available width.
+    ///
+    /// The cache key is `child_c`. On a hit the cached Vec is cloned (cheap for
+    /// typical UI depths); on a miss children are re-measured and spacers expanded.
+    fn get_child_sizes(&self, child_c: Constraints, available_w: f32, ctx: &LayoutCtx) -> Vec<Vec2> {
+        let mut cache = self.cached_sizes.borrow_mut();
+        if let Some((cached_c, ref sizes)) = *cache {
+            if cached_c == child_c {
+                return sizes.clone();
+            }
+        }
+        let mut sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, ctx)).collect();
+        Self::distribute_spacers(&mut sizes, available_w, self.children.len(), self.spacing);
+        *cache = Some((child_c, sizes.clone()));
+        sizes
+    }
 }
 
 impl Default for Row {
@@ -310,7 +372,11 @@ impl Widget for Row {
         let inner_h = self.inner_height(constraints.max.y);
         let child_c = self.child_constraints(inner_h);
 
-        let sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, ctx)).collect();
+        // For measure() we don't know the final available_w yet (it depends on
+        // our own reported width), so pass constraints.max.x as the budget.
+        let available_w = if constraints.max.x.is_finite() { constraints.max.x } else { 0.0 };
+        let sizes = self.get_child_sizes(child_c, available_w, ctx);
+
         let spacer_count = sizes.iter().filter(|s| s.x == 0.0 && s.y == 0.0).count();
 
         let fixed_w: f32     = sizes.iter().map(|s| s.x).sum();
@@ -341,15 +407,11 @@ impl Widget for Row {
     fn paint(&self, painter: &mut Painter, rect: Rect) {
         let fonts = painter.font_system;
         let scale = painter.scale;
-        let ctx = LayoutCtx { fonts, scale };
+        let ctx = LayoutCtx { fonts, scale, focus: None };
 
         let inner   = inset_rect(rect, self.padding);
         let child_c = self.child_constraints(inner.size.y);
-
-        // First pass: natural sizes.
-        let mut sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, &ctx)).collect();
-        // Expand spacer children to fill remaining horizontal space.
-        Self::distribute_spacers(&mut sizes, inner.size.x, self.children.len(), self.spacing);
+        let sizes   = self.get_child_sizes(child_c, inner.size.x, &ctx);
 
         let mut x = inner.origin.x;
         for (i, (child, s)) in self.children.iter().zip(sizes.iter()).enumerate() {
@@ -369,9 +431,8 @@ impl Widget for Row {
         let spacing     = self.spacing;
         let n           = self.children.len();
 
-        // Measure pass (immutable) to get each child's size, then expand spacers.
-        let mut sizes: Vec<Vec2> = self.children.iter().map(|c| c.measure(child_c, ctx)).collect();
-        Self::distribute_spacers(&mut sizes, inner.size.x, n, spacing);
+        // Use cached sizes (populated by measure/paint earlier this frame).
+        let sizes = self.get_child_sizes(child_c, inner.size.x, ctx);
 
         // Event-routing pass (mutable).
         let mut x = inner.origin.x;

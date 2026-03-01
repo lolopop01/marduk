@@ -1,9 +1,12 @@
+use std::cell::RefCell;
+
 use marduk_engine::coords::{CornerRadii, Rect, Vec2};
 use marduk_engine::paint::{Color, Paint};
 use marduk_engine::scene::{Border, DrawList, ZIndex};
 use marduk_engine::text::{FontId, FontSystem};
 
 use crate::constraints::LayoutCtx;
+use crate::focus::{FocusId, FocusManager};
 
 /// Drawing surface passed to [`Widget::paint`].
 ///
@@ -23,6 +26,11 @@ pub struct Painter<'a> {
     pub mouse_pos: Vec2,
     /// True while the primary button is held down.
     pub mouse_pressed: bool,
+    /// Focus manager for this frame. May be `None` in contexts without focus support.
+    ///
+    /// Stored as a `RefCell` reference so focus state can be mutated through the
+    /// shared `&Painter` reference that widget paint implementations receive.
+    focus: Option<&'a RefCell<FocusManager>>,
 }
 
 impl<'a> Painter<'a> {
@@ -33,7 +41,44 @@ impl<'a> Painter<'a> {
         mouse_pressed: bool,
         scale: f32,
     ) -> Self {
-        Self { draw_list, font_system, scale, z: 0, mouse_pos, mouse_pressed }
+        Self { draw_list, font_system, scale, z: 0, mouse_pos, mouse_pressed, focus: None }
+    }
+
+    pub(crate) fn with_focus(mut self, focus: &'a RefCell<FocusManager>) -> Self {
+        self.focus = Some(focus);
+        self
+    }
+
+    // ── focus ─────────────────────────────────────────────────────────────
+
+    /// Returns `true` if `id` is the currently focused widget.
+    ///
+    /// Call this during paint to drive focused-state visuals (e.g. border color).
+    #[inline]
+    pub fn is_focused(&self, id: FocusId) -> bool {
+        self.focus.as_ref().is_some_and(|f| f.borrow().is_focused(id))
+    }
+
+    /// Request keyboard focus for `id`.
+    ///
+    /// Call this during paint when the widget is clicked or activated.
+    /// Focus takes effect at end of frame.
+    #[inline]
+    pub fn request_focus(&mut self, id: FocusId) {
+        if let Some(f) = &self.focus {
+            f.borrow_mut().request_focus(id);
+        }
+    }
+
+    /// Register `id` as a focusable widget in Tab-cycle order.
+    ///
+    /// Call this from [`Widget::paint`] for every widget that can receive keyboard
+    /// focus. The order of calls determines the Tab-cycle order.
+    #[inline]
+    pub fn register_focusable(&mut self, id: FocusId) {
+        if let Some(f) = &self.focus {
+            f.borrow_mut().register(id);
+        }
     }
 
     // ── input queries ─────────────────────────────────────────────────────
@@ -76,7 +121,7 @@ impl<'a> Painter<'a> {
     /// its children to compute their layout positions.
     #[inline]
     pub fn layout_ctx(&self) -> LayoutCtx<'_> {
-        LayoutCtx { fonts: self.font_system, scale: self.scale }
+        LayoutCtx { fonts: self.font_system, scale: self.scale, focus: None }
     }
 
     // ── drawing ───────────────────────────────────────────────────────────

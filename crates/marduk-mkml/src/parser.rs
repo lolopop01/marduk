@@ -1,47 +1,62 @@
 use crate::ast::{DslDocument, Import, Node, Prop, Value};
 use crate::error::ParseError;
-use crate::lexer::{Lexer, Token};
+use crate::lexer::{Lexer, Token, TokenWithPos};
 
 // ── Parser ────────────────────────────────────────────────────────────────
 
 pub struct Parser {
-    tokens: Vec<Token>,
+    tokens: Vec<TokenWithPos>,
     pos: usize,
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    pub fn new(tokens: Vec<TokenWithPos>) -> Self {
         Self { tokens, pos: 0 }
     }
 
+    fn current_pos(&self) -> (usize, usize) {
+        self.tokens
+            .get(self.pos)
+            .map(|t| (t.line, t.col))
+            .or_else(|| self.tokens.last().map(|t| (t.line, t.col)))
+            .unwrap_or((1, 1))
+    }
+
     fn peek(&self) -> &Token {
-        self.tokens.get(self.pos).unwrap_or(&Token::Eof)
+        self.tokens.get(self.pos).map(|t| &t.token).unwrap_or(&Token::Eof)
     }
 
     /// Look at the token `offset` positions ahead of current without consuming.
     fn peek_ahead(&self, offset: usize) -> &Token {
-        self.tokens.get(self.pos + offset).unwrap_or(&Token::Eof)
+        self.tokens.get(self.pos + offset).map(|t| &t.token).unwrap_or(&Token::Eof)
     }
 
     fn advance(&mut self) -> Token {
-        let tok = self.tokens.get(self.pos).cloned().unwrap_or(Token::Eof);
+        let tok = self.tokens.get(self.pos)
+            .map(|t| t.token.clone())
+            .unwrap_or(Token::Eof);
         if self.pos < self.tokens.len() {
             self.pos += 1;
         }
         tok
     }
 
+    fn err(&self, msg: impl Into<String>) -> ParseError {
+        let (line, col) = self.current_pos();
+        ParseError::new(msg, line, col)
+    }
+
     fn expect_ident(&mut self) -> Result<String, ParseError> {
         match self.advance() {
             Token::Ident(s) => Ok(s),
-            tok => Err(ParseError::new(format!("expected identifier, got {:?}", tok))),
+            tok => Err(self.err(format!("expected identifier, got {:?}", tok))),
         }
     }
 
     fn expect_str(&mut self) -> Result<String, ParseError> {
         match self.advance() {
             Token::Str(s) => Ok(s),
-            tok => Err(ParseError::new(format!("expected string, got {:?}", tok))),
+            tok => Err(self.err(format!("expected string, got {:?}", tok))),
         }
     }
 
@@ -50,7 +65,7 @@ impl Parser {
         if &got == expected {
             Ok(())
         } else {
-            Err(ParseError::new(format!("expected {:?}, got {:?}", expected, got)))
+            Err(self.err(format!("expected {:?}, got {:?}", expected, got)))
         }
     }
 
@@ -117,7 +132,7 @@ impl Parser {
         loop {
             match self.peek() {
                 Token::RBrace => { self.advance(); break; }
-                Token::Eof    => return Err(ParseError::new("unclosed '{' block")),
+                Token::Eof    => return Err(self.err("unclosed '{' block")),
                 Token::Ident(_) => {
                     if self.peek_ahead(1) == &Token::Colon {
                         props.push(self.parse_prop()?);
@@ -126,7 +141,7 @@ impl Parser {
                     }
                 }
                 tok => {
-                    return Err(ParseError::new(format!(
+                    return Err(self.err(format!(
                         "unexpected {:?} inside block — expected a property (key: value) or a widget name",
                         tok
                     )));
@@ -154,7 +169,7 @@ impl Parser {
             Token::Number(n) => Ok(Value::Number(n)),
             Token::Color(c)  => Ok(Value::Color(c)),
             Token::Ident(s)  => Ok(Value::Ident(s)),
-            tok => Err(ParseError::new(format!("expected a value, got {:?}", tok))),
+            tok => Err(self.err(format!("expected a value, got {:?}", tok))),
         }
     }
 }

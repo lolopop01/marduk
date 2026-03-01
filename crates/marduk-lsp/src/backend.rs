@@ -158,16 +158,21 @@ impl LanguageServer for Backend {
 fn parse_diagnostics(text: &str) -> Vec<Diagnostic> {
     match marduk_mkml::parse_str(text) {
         Ok(_) => vec![],
-        Err(e) => vec![Diagnostic {
-            range: Range {
-                start: Position::new(0, 0),
-                end: Position::new(0, 1),
-            },
-            severity: Some(DiagnosticSeverity::ERROR),
-            source: Some("marduk-lsp".to_string()),
-            message: e.to_string(),
-            ..Default::default()
-        }],
+        Err(e) => {
+            // ParseError line/col are 1-based; LSP Position is 0-based.
+            let line = e.line.saturating_sub(1) as u32;
+            let col  = e.col.saturating_sub(1) as u32;
+            vec![Diagnostic {
+                range: Range {
+                    start: Position::new(line, col),
+                    end:   Position::new(line, col + 1),
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                source: Some("marduk-lsp".to_string()),
+                message: e.message.clone(),
+                ..Default::default()
+            }]
+        }
     }
 }
 

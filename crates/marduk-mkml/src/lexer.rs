@@ -21,24 +21,47 @@ pub enum Token {
     Eof,
 }
 
+// ── TokenWithPos ───────────────────────────────────────────────────────────
+
+/// A token annotated with its source position.
+#[derive(Debug, Clone)]
+pub struct TokenWithPos {
+    pub token: Token,
+    /// 1-based line number of the first character of this token.
+    pub line: usize,
+    /// 1-based column number of the first character of this token.
+    pub col: usize,
+}
+
 // ── Lexer ─────────────────────────────────────────────────────────────────
 
 pub struct Lexer<'s> {
     src: &'s str,
     pos: usize,
+    /// 1-based current line number.
+    line: usize,
+    /// 1-based current column number.
+    col: usize,
 }
 
 impl<'s> Lexer<'s> {
     pub fn new(src: &'s str) -> Self {
-        Self { src, pos: 0 }
+        Self { src, pos: 0, line: 1, col: 1 }
     }
 
-    pub fn tokenize(mut self) -> Result<Vec<Token>, ParseError> {
+    /// Returns the current `(line, col)` position (1-based).
+    pub fn current_pos(&self) -> (usize, usize) {
+        (self.line, self.col)
+    }
+
+    pub fn tokenize(mut self) -> Result<Vec<TokenWithPos>, ParseError> {
         let mut tokens = Vec::new();
         loop {
+            self.skip_whitespace_and_comments();
+            let (line, col) = self.current_pos();
             let tok = self.next_token()?;
             let eof = tok == Token::Eof;
-            tokens.push(tok);
+            tokens.push(TokenWithPos { token: tok, line, col });
             if eof {
                 break;
             }
@@ -53,6 +76,12 @@ impl<'s> Lexer<'s> {
     fn advance(&mut self) -> Option<char> {
         let ch = self.src[self.pos..].chars().next()?;
         self.pos += ch.len_utf8();
+        if ch == '\n' {
+            self.line += 1;
+            self.col = 1;
+        } else {
+            self.col += 1;
+        }
         Some(ch)
     }
 
@@ -84,9 +113,8 @@ impl<'s> Lexer<'s> {
         }
     }
 
+    /// Called after `skip_whitespace_and_comments()`. Does NOT skip whitespace itself.
     fn next_token(&mut self) -> Result<Token, ParseError> {
-        self.skip_whitespace_and_comments();
-
         let ch = match self.peek() {
             None => return Ok(Token::Eof),
             Some(c) => c,
@@ -100,7 +128,10 @@ impl<'s> Lexer<'s> {
             '#' => self.lex_color(),
             c if c.is_ascii_digit() || c == '-' => self.lex_number(),
             c if c.is_alphabetic() || c == '_' => self.lex_ident_or_keyword(),
-            other => Err(ParseError::new(format!("unexpected character {:?}", other))),
+            other => {
+                let (line, col) = self.current_pos();
+                Err(ParseError::new(format!("unexpected character {:?}", other), line, col))
+            }
         }
     }
 
@@ -108,17 +139,19 @@ impl<'s> Lexer<'s> {
         self.advance(); // consume opening `"`
         let mut s = String::new();
         loop {
+            let (line, col) = self.current_pos();
             match self.advance() {
-                None => return Err(ParseError::new("unterminated string literal")),
+                None => return Err(ParseError::new("unterminated string literal", line, col)),
                 Some('"') => break,
                 Some('\\') => {
+                    let (el, ec) = self.current_pos();
                     match self.advance() {
                         Some('n')  => s.push('\n'),
                         Some('t')  => s.push('\t'),
                         Some('"')  => s.push('"'),
                         Some('\\') => s.push('\\'),
                         Some(c)    => s.push(c),
-                        None => return Err(ParseError::new("unterminated escape sequence")),
+                        None => return Err(ParseError::new("unterminated escape sequence", el, ec)),
                     }
                 }
                 Some(c) => s.push(c),
@@ -128,6 +161,7 @@ impl<'s> Lexer<'s> {
     }
 
     fn lex_color(&mut self) -> Result<Token, ParseError> {
+        let (line, col) = self.current_pos();
         self.advance(); // consume `#`
         let start = self.pos;
         let mut count = 0;
@@ -136,10 +170,10 @@ impl<'s> Lexer<'s> {
             count += 1;
         }
         if count != 6 && count != 8 {
-            return Err(ParseError::new(format!(
-                "color literal must be #rrggbb or #rrggbbaa, got {} digits",
-                count
-            )));
+            return Err(ParseError::new(
+                format!("color literal must be #rrggbb or #rrggbbaa, got {} digits", count),
+                line, col,
+            ));
         }
         let hex = &self.src[start..self.pos];
         // All characters were validated as ascii_hexdigit above, and 2 hex
@@ -156,6 +190,7 @@ impl<'s> Lexer<'s> {
     }
 
     fn lex_number(&mut self) -> Result<Token, ParseError> {
+        let (line, col) = self.current_pos();
         let start = self.pos;
         if self.peek() == Some('-') {
             self.advance();
@@ -172,7 +207,7 @@ impl<'s> Lexer<'s> {
         let s = &self.src[start..self.pos];
         s.parse::<f32>()
             .map(Token::Number)
-            .map_err(|_| ParseError::new(format!("invalid number {:?}", s)))
+            .map_err(|_| ParseError::new(format!("invalid number {:?}", s), line, col))
     }
 
     fn lex_ident_or_keyword(&mut self) -> Result<Token, ParseError> {

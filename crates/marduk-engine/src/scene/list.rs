@@ -96,13 +96,11 @@ impl DrawList {
 
     /// Ends the most recent scissor region started by [`push_clip`].
     ///
-    /// # Panics
-    /// Always panics if called without a matching [`push_clip`]. Unbalanced
-    /// push/pop pairs indicate a widget implementation bug and are caught in
-    /// both debug and release builds.
+    /// In debug builds, panics if called without a matching [`push_clip`].
+    /// In release builds, the call is silently ignored to avoid crashing production apps.
     #[inline]
     pub fn pop_clip(&mut self) {
-        assert!(!self.clip_stack.is_empty(), "pop_clip called without matching push_clip");
+        debug_assert!(!self.clip_stack.is_empty(), "pop_clip called without matching push_clip");
         self.clip_stack.pop();
     }
 

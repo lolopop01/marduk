@@ -1,5 +1,8 @@
+use std::cell::RefCell;
 use marduk_engine::coords::{Rect, Vec2};
 use marduk_engine::text::FontSystem;
+
+use crate::focus::{FocusId, FocusManager};
 
 // ── Edges ─────────────────────────────────────────────────────────────────
 
@@ -52,7 +55,7 @@ impl Edges {
 ///
 /// A child may return any size in `[min, max]`. Parents enforce their own
 /// policy by calling [`Constraints::constrain`] on the returned size.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Constraints {
     pub min: Vec2,
     pub max: Vec2,
@@ -100,6 +103,24 @@ impl Constraints {
         }
     }
 
+    /// Exact-size constraint: child must be exactly `size` (alias for [`tight`](Self::tight)).
+    #[inline]
+    pub fn fixed(size: Vec2) -> Self {
+        Self::tight(size)
+    }
+
+    /// Min-only constraint: child must be at least `min`; no upper bound.
+    #[inline]
+    pub fn at_least(min: Vec2) -> Self {
+        Self { min, max: Vec2::new(f32::INFINITY, f32::INFINITY) }
+    }
+
+    /// Explicit range: child can be any size in `[min, max]`.
+    #[inline]
+    pub fn between(min: Vec2, max: Vec2) -> Self {
+        Self { min, max }
+    }
+
     /// Replace the height constraint with `f32::INFINITY` (used by flex containers).
     #[inline]
     pub fn with_infinite_height(self) -> Self {
@@ -115,16 +136,39 @@ impl Constraints {
 
 // ── LayoutCtx ────────────────────────────────────────────────────────────
 
-/// Resources made available to [`Widget::measure`].
+/// Resources made available to [`Widget::measure`] and [`Widget::on_event`].
 ///
-/// Passed down through the widget tree so any widget can measure text without
-/// owning the `FontSystem`.
+/// Passed down through the widget tree so any widget can measure text and
+/// interact with the focus system without owning those resources.
 pub struct LayoutCtx<'a> {
     pub fonts: &'a FontSystem,
     /// Physical-to-logical pixel ratio (os_scale × zoom), matching the text
     /// renderer's `raster_scale`.  Pass this to `fonts.measure_text_scaled` so
     /// that measured widths exactly match what the renderer will draw.
     pub scale: f32,
+    /// Focus manager, available during event routing so widgets can request focus.
+    ///
+    /// `None` in contexts that do not support focus (custom renderers, tests).
+    pub focus: Option<&'a RefCell<FocusManager>>,
+}
+
+impl<'a> LayoutCtx<'a> {
+    /// Request that `id` becomes the focused widget.
+    ///
+    /// Call this from [`Widget::on_event`] when the widget receives a `Click`
+    /// or other activation event. The focus change takes effect at end of frame.
+    #[inline]
+    pub fn request_focus(&self, id: FocusId) {
+        if let Some(fm) = self.focus {
+            fm.borrow_mut().request_focus(id);
+        }
+    }
+
+    /// Returns `true` if `id` is currently focused.
+    #[inline]
+    pub fn is_focused(&self, id: FocusId) -> bool {
+        self.focus.is_some_and(|fm| fm.borrow().is_focused(id))
+    }
 }
 
 // ── rect helper ──────────────────────────────────────────────────────────

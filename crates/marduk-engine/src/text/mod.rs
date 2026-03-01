@@ -1,3 +1,3 @@
 mod font_system;
 
-pub use font_system::{FontId, FontSystem};
+pub use font_system::{FontId, FontLoadError, FontSystem};

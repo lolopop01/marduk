@@ -17,12 +17,48 @@ pub struct Color {
 impl Color {
     #[inline]
     pub const fn transparent() -> Self {
-        Self {
-            r: 0.0,
-            g: 0.0,
-            b: 0.0,
-            a: 0.0,
-        }
+        Self { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }
+    }
+
+    /// Creates a premultiplied color from straight sRGB bytes (`0`–`255`).
+    ///
+    /// This is the preferred constructor for colors coming from hex literals or
+    /// the `.mkml` DSL parser, which produce `[u8; 4]` straight-alpha RGBA.
+    #[inline]
+    pub fn from_srgb_u8(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self::from_srgb(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a as f32 / 255.0)
+    }
+
+    /// Creates a premultiplied color from straight sRGB `f32` components in `[0, 1]`.
+    ///
+    /// Clearer alternative to [`from_straight`](Self::from_straight), which is kept
+    /// for backwards compatibility.
+    #[inline]
+    pub fn from_srgb(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self::from_straight(r, g, b, a)
+    }
+
+    /// Debug-only validation: asserts that RGB channels do not exceed alpha,
+    /// which would indicate a straight-alpha color was passed where premul was expected.
+    ///
+    /// No-op in release builds.
+    #[inline]
+    pub fn debug_assert_premul(self) {
+        debug_assert!(
+            self.r <= self.a + f32::EPSILON,
+            "Color::debug_assert_premul: r ({}) > a ({}), looks like straight-alpha was passed as premul",
+            self.r, self.a
+        );
+        debug_assert!(
+            self.g <= self.a + f32::EPSILON,
+            "Color::debug_assert_premul: g ({}) > a ({}), looks like straight-alpha was passed as premul",
+            self.g, self.a
+        );
+        debug_assert!(
+            self.b <= self.a + f32::EPSILON,
+            "Color::debug_assert_premul: b ({}) > a ({}), looks like straight-alpha was passed as premul",
+            self.b, self.a
+        );
     }
 
     /// Creates a premultiplied color from premultiplied components.

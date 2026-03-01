@@ -6,6 +6,7 @@ use marduk_engine::text::FontId;
 
 use crate::constraints::{Constraints, Edges, LayoutCtx};
 use crate::event::{EventResult, UiEvent};
+use crate::focus::FocusId;
 use crate::painter::Painter;
 use crate::widget::Widget;
 use crate::widgets::text_edit::TextEditState;
@@ -29,6 +30,11 @@ pub struct TextBox {
     /// Suppresses a `Click` cursor-set on the frame a drag ends.
     drag_was_active:  bool,
     focused:          bool,
+    /// Stable identity for the focus manager (Tab-key cycling, FocusGained/FocusLost).
+    ///
+    /// Allocated once in `new()`. The `focused` bool above remains the primary
+    /// source of truth for visual state; `focus_id` bridges to `FocusManager`.
+    focus_id:         FocusId,
     font:             Option<FontId>,
     font_size:        f32,
     text_color:       Color,
@@ -56,6 +62,7 @@ impl TextBox {
             edit:                 TextEditState::new(""),
             drag_was_active:      false,
             focused:              false,
+            focus_id:             FocusId::new(),
             font:                 None,
             font_size:            13.0,
             text_color:           Color::from_straight(0.9, 0.92, 0.95, 1.0),
@@ -173,9 +180,15 @@ impl Widget for TextBox {
     }
 
     fn paint(&self, painter: &mut Painter, rect: Rect) {
-        let bg = if self.focused { self.focused_bg } else { self.bg };
-        let border_color = if self.focused { self.focused_border_color } else { self.border_color };
-        let border_width = if self.focused { 2.0 } else { 1.0 };
+        // Register as focusable so Tab-key cycling can reach this widget.
+        painter.register_focusable(self.focus_id);
+
+        // Focused state: either explicitly set (DSL / click) or via FocusManager (Tab cycling).
+        let is_focused = self.focused || painter.is_focused(self.focus_id);
+
+        let bg = if is_focused { self.focused_bg } else { self.bg };
+        let border_color = if is_focused { self.focused_border_color } else { self.border_color };
+        let border_width = if is_focused { 2.0 } else { 1.0 };
 
         painter.fill_rounded_rect(
             rect, self.corner_radius, Paint::Solid(bg),
@@ -202,7 +215,7 @@ impl Widget for TextBox {
             let fs     = painter.font_system;
 
             // Selection highlight
-            if self.focused && self.edit.has_selection() {
+            if is_focused && self.edit.has_selection() {
                 let (lo, hi) = self.edit.sel_range();
                 let x0 = fs.measure_text_scaled(&self.edit.text[..lo], font, self.font_size, None, scale).x
                     - scroll;
@@ -226,7 +239,7 @@ impl Widget for TextBox {
             );
 
             // Cursor bar — only when nothing is selected
-            if self.focused && !self.edit.has_selection() {
+            if is_focused && !self.edit.has_selection() {
                 let scale = painter.scale;
                 let fs    = painter.font_system;
                 let cx = fs.measure_text_scaled(
@@ -248,7 +261,27 @@ impl Widget for TextBox {
     }
 
     fn on_event(&mut self, event: &UiEvent, rect: Rect, ctx: &LayoutCtx<'_>) -> EventResult {
+        // Focused state: either explicitly set (DSL / click) or via FocusManager (Tab cycling).
+        let fm_focused = ctx.is_focused(self.focus_id);
+
         match event {
+            // ── FocusGained: sync self.focused when Tab cycles to this widget ─
+            UiEvent::FocusGained => {
+                if fm_focused {
+                    self.focused = true;
+                    if let Some(f) = &mut self.on_focus { f(); }
+                }
+                EventResult::Ignored
+            }
+
+            // ── FocusLost: sync self.focused when Tab cycles away ─────────
+            UiEvent::FocusLost => {
+                if !fm_focused {
+                    self.focused = false;
+                }
+                EventResult::Ignored
+            }
+
             // ── Click: place cursor ────────────────────────────────────────
             UiEvent::Click { pos } => {
                 if rect.contains(*pos) {
@@ -261,6 +294,8 @@ impl Widget for TextBox {
                         self.focused = true;
                         if let Some(f) = &mut self.on_focus { f(); }
                     }
+                    // Also register with the focus manager so Tab cycling stays in sync.
+                    ctx.request_focus(self.focus_id);
                     if let Some(font) = self.font {
                         let inner = self.inner_rect(rect);
                         let rel_x = pos.x - inner.origin.x + self.edit.scroll_offset;
@@ -286,8 +321,9 @@ impl Widget for TextBox {
             UiEvent::Drag { pos, start } => {
                 if rect.contains(*start) {
                     // Gain focus on the first drag frame if not already focused.
-                    if !self.focused {
+                    if !self.focused && !fm_focused {
                         self.focused = true;
+                        ctx.request_focus(self.focus_id);
                         if let Some(f) = &mut self.on_focus { f(); }
                     }
                     if let Some(font) = self.font {
@@ -318,7 +354,7 @@ impl Widget for TextBox {
 
             // ── Text input ─────────────────────────────────────────────────
             UiEvent::TextInput { text } => {
-                if !self.focused { return EventResult::Ignored; }
+                if !self.focused && !fm_focused { return EventResult::Ignored; }
                 self.edit.insert_str(text);
                 if let Some(font) = self.font {
                     let inner = self.inner_rect(rect);
@@ -333,7 +369,7 @@ impl Widget for TextBox {
 
             // ── Key presses ────────────────────────────────────────────────
             UiEvent::KeyPress { key, modifiers } => {
-                if !self.focused { return EventResult::Ignored; }
+                if !self.focused && !fm_focused { return EventResult::Ignored; }
 
                 let shift = modifiers.shift;
                 let ctrl  = modifiers.ctrl;

@@ -22,12 +22,7 @@ trait NodeExt {
 impl NodeExt for Node {
     fn engine_color(&self, key: &str) -> Option<Color> {
         let [r, g, b, a] = self.prop_color(key)?;
-        Some(Color::from_straight(
-            r as f32 / 255.0,
-            g as f32 / 255.0,
-            b as f32 / 255.0,
-            a as f32 / 255.0,
-        ))
+        Some(Color::from_srgb_u8(r, g, b, a))
     }
 }
 use crate::widget::Element;
@@ -181,7 +176,24 @@ impl DslLoader {
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
                 } else {
-                    Container::new().into()
+                    #[cfg(debug_assertions)]
+                    eprintln!("marduk-ui: unknown widget '{alias}'");
+                    // Render a visible red placeholder so layout errors are obvious.
+                    let mut c = Container::new()
+                        .background(marduk_engine::paint::Paint::Solid(
+                            Color::from_srgb_u8(180, 40, 40, 255),
+                        ))
+                        .padding_all(4.0);
+                    if let Some(font) = bindings.fonts.values().next().copied() {
+                        let label: Element = Text::new(
+                            format!("[unknown: {alias}]"),
+                            font,
+                            12.0,
+                            Color::from_srgb(1.0, 1.0, 1.0, 1.0),
+                        ).into();
+                        c = c.child(label);
+                    }
+                    c.into()
                 }
             }
         }
@@ -213,7 +225,7 @@ impl DslLoader {
         if let Some(col) = node.engine_color("bg") {
             c = c.background(Paint::Solid(col));
         }
-        if let Some(r) = node.prop_f32("corner_radius") {
+        if let Some(r) = node.prop_f32("radius").or_else(|| node.prop_f32("corner_radius")) {
             c = c.corner_radius(r);
         }
         c = self.apply_border(c, node);
@@ -227,8 +239,12 @@ impl DslLoader {
 
     fn build_column(&self, node: &Node, bindings: &DslBindings) -> Element {
         let mut col = Column::new();
-        // Accept `gap` (preferred) or `spacing` (compat)
-        if let Some(v) = node.prop_f32("gap").or_else(|| node.prop_f32("spacing")) {
+        // Accept `gap` (preferred) or `spacing` (deprecated compat)
+        if let Some(v) = node.prop_f32("gap") {
+            col = col.spacing(v);
+        } else if let Some(v) = node.prop_f32("spacing") {
+            #[cfg(debug_assertions)]
+            eprintln!("marduk-ui: Column uses deprecated property 'spacing', use 'gap' instead");
             col = col.spacing(v);
         }
         if let Some(v) = node.prop_f32("padding") {
@@ -249,8 +265,12 @@ impl DslLoader {
 
     fn build_row(&self, node: &Node, bindings: &DslBindings) -> Element {
         let mut row = Row::new();
-        // Accept `gap` (preferred) or `spacing` (compat)
-        if let Some(v) = node.prop_f32("gap").or_else(|| node.prop_f32("spacing")) {
+        // Accept `gap` (preferred) or `spacing` (deprecated compat)
+        if let Some(v) = node.prop_f32("gap") {
+            row = row.spacing(v);
+        } else if let Some(v) = node.prop_f32("spacing") {
+            #[cfg(debug_assertions)]
+            eprintln!("marduk-ui: Row uses deprecated property 'spacing', use 'gap' instead");
             row = row.spacing(v);
         }
         if let Some(v) = node.prop_f32("padding") {
@@ -327,7 +347,8 @@ impl DslLoader {
     // ── Checkbox ──────────────────────────────────────────────────────────
 
     fn build_checkbox(&self, node: &Node, bindings: &DslBindings) -> Element {
-        let state_key = node.prop_str("state_key")
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
             .or_else(|| node.prop_str("on_change"))
             .map(|s| s.to_string());
 
@@ -377,7 +398,8 @@ impl DslLoader {
     // ── Toggle ────────────────────────────────────────────────────────────
 
     fn build_toggle(&self, node: &Node, bindings: &DslBindings) -> Element {
-        let state_key = node.prop_str("state_key")
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
             .or_else(|| node.prop_str("on_change"))
             .map(|s| s.to_string());
 
@@ -416,7 +438,8 @@ impl DslLoader {
     // ── Slider ────────────────────────────────────────────────────────────
 
     fn build_slider(&self, node: &Node, bindings: &DslBindings) -> Element {
-        let state_key = node.prop_str("state_key")
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
             .or_else(|| node.prop_str("on_change"))
             .map(|s| s.to_string());
 
@@ -469,7 +492,8 @@ impl DslLoader {
     // ── RadioGroup ────────────────────────────────────────────────────────
 
     fn build_radio_group(&self, node: &Node, bindings: &DslBindings) -> Element {
-        let state_key = node.prop_str("state_key")
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
             .or_else(|| node.prop_str("on_change"))
             .map(|s| s.to_string());
 
@@ -525,7 +549,8 @@ impl DslLoader {
     // ── TextBox ───────────────────────────────────────────────────────────
 
     fn build_textbox(&self, node: &Node, bindings: &DslBindings) -> Element {
-        let state_key = node.prop_str("state_key")
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
             .or_else(|| node.prop_str("on_change"))
             .or_else(|| node.prop_str("on_submit"))
             .map(|s| s.to_string());
@@ -549,7 +574,10 @@ impl DslLoader {
             .unwrap_or(false);
 
         // Restore cursor/anchor/scroll from previous frame (if any).
-        let (cursor, anchor, scroll) = state_key.as_deref()
+        // The cursor state is persisted under "{id}::cursor" to avoid colliding
+        // with the text value stored under "{id}".
+        let cursor_key = state_key.as_deref().map(|k| format!("{k}::cursor"));
+        let (cursor, anchor, scroll) = cursor_key.as_deref()
             .and_then(|k| bindings.text_edit_states.borrow().get(k).copied())
             .unwrap_or_else(|| (text.len(), text.len(), 0.0));
 
@@ -579,12 +607,12 @@ impl DslLoader {
             tb = tb.placeholder(placeholder.to_string());
         }
 
-        // on_cursor_change: persist cursor/anchor/scroll state across frame rebuilds
-        if let Some(key) = state_key.clone() {
+        // on_cursor_change: persist cursor/anchor/scroll state across frame rebuilds.
+        // Stored under "{id}::cursor" to avoid colliding with the text value.
+        if let Some(key) = cursor_key.clone() {
             let slot = Rc::clone(&bindings.text_edit_states);
-            let k = key.clone();
             tb = tb.on_cursor_change(move |cursor, anchor, scroll| {
-                slot.borrow_mut().insert(k.clone(), (cursor, anchor, scroll));
+                slot.borrow_mut().insert(key.clone(), (cursor, anchor, scroll));
             });
         }
 
@@ -634,7 +662,8 @@ impl DslLoader {
     // ── ScrollView ────────────────────────────────────────────────────────
 
     fn build_scroll_view(&self, node: &Node, bindings: &DslBindings) -> Element {
-        let state_key = node.prop_str("state_key")
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
             .or_else(|| node.prop_str("on_scroll"))
             .map(|s| s.to_string());
 
@@ -706,7 +735,7 @@ impl DslLoader {
     /// natively.
     fn maybe_wrap_bg(&self, elem: Element, node: &Node) -> Element {
         let bg     = node.engine_color("bg");
-        let radius = node.prop_f32("corner_radius");
+        let radius = node.prop_f32("radius").or_else(|| node.prop_f32("corner_radius"));
         let has_border = node.prop_f32("border_width").is_some();
 
         if bg.is_some() || has_border || radius.is_some() {
@@ -730,11 +759,21 @@ impl DslLoader {
             .or_else(|| bindings.fonts.values().next().copied())
     }
 
-    /// Parse `align` (preferred) or `cross_align` (compat) property.
+    /// Parse `align` (preferred) or `cross_align` (deprecated compat) property.
     fn parse_align(&self, node: &Node) -> Align {
-        let val = node.prop_str("align")
-            .or_else(|| node.prop_str("cross_align"))
-            .unwrap_or("stretch");
+        // `align` is the canonical name; `cross_align` is kept for compatibility.
+        let val = if let Some(v) = node.prop_str("align") {
+            v
+        } else if let Some(v) = node.prop_str("cross_align") {
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "marduk-ui: '{}' uses deprecated property 'cross_align', use 'align' instead",
+                node.widget
+            );
+            v
+        } else {
+            "stretch"
+        };
         match val {
             "start"   => Align::Start,
             "center"  => Align::Center,
