@@ -4,5 +4,5 @@
 
 mod runtime;
 
-pub use runtime::{Runtime, RuntimeConfig, RuntimeCtx};
+pub use runtime::{Runtime, RuntimeConfig, RuntimeCtx, WindowMode};
 pub use winit::window::CursorIcon;

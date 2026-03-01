@@ -6,7 +6,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{Window, WindowId};
+use winit::window::{Fullscreen, Window, WindowId};
 
 use crate::core::{App as CoreApp, AppControl, FrameCtx, WindowCtx};
 use crate::device::{Gpu, GpuInit};
@@ -14,11 +14,24 @@ use crate::input::{InputEvent, InputFrame, InputState};
 use crate::input::platform::winit as input_winit;
 use crate::time::FrameClock;
 
+/// How the initial window should be presented.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WindowMode {
+    /// Normal resizable window. `initial_size` sets the starting dimensions.
+    #[default]
+    Windowed,
+    /// OS-maximized window — fills the screen but keeps the title bar.
+    Maximized,
+    /// Borderless fullscreen — covers the entire screen, no title bar.
+    Fullscreen,
+}
+
 /// Window/runtime configuration.
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     pub title: String,
     pub initial_size: LogicalSize<f64>,
+    pub window_mode: WindowMode,
 }
 
 impl Default for RuntimeConfig {
@@ -26,6 +39,7 @@ impl Default for RuntimeConfig {
         Self {
             title: "marduk".to_string(),
             initial_size: LogicalSize::new(1280.0, 720.0),
+            window_mode: WindowMode::Windowed,
         }
     }
 }
@@ -125,10 +139,18 @@ where
         event_loop: &ActiveEventLoop,
         config: RuntimeConfig,
     ) -> Result<WindowId> {
-        let attrs = Window::default_attributes()
+        let mut attrs = Window::default_attributes()
             .with_visible(true)
             .with_title(config.title.clone())
             .with_inner_size(config.initial_size);
+
+        match config.window_mode {
+            WindowMode::Windowed   => {}
+            WindowMode::Maximized  => attrs = attrs.with_maximized(true),
+            WindowMode::Fullscreen => attrs = attrs.with_fullscreen(
+                Some(Fullscreen::Borderless(None))
+            ),
+        }
 
 
         let window = event_loop

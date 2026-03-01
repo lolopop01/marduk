@@ -1,4 +1,4 @@
-use marduk_ui::Application;
+use marduk_ui::{Application, WindowMode};
 
 fn main() {
     println!();
@@ -15,7 +15,8 @@ fn main() {
     Application::new()
         .title("Redline Logistics — Depot YUL-WEST")
         .size(620.0, 500.0)
-        .zoom(1.0)   // Ctrl+Scroll to adjust at runtime
+        .zoom(1.0)               // Ctrl+Scroll to adjust at runtime
+        .window_mode(WindowMode::Fullscreen)
         .font("body", load_font())
         // ── components ────────────────────────────────────────────────────
         .component("Header",   include_str!("../ui/header.mkml"))

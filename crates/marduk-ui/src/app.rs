@@ -12,7 +12,7 @@ use marduk_engine::render::shapes::rect::RectRenderer;
 use marduk_engine::render::shapes::rounded_rect::RoundedRectRenderer;
 use marduk_engine::render::shapes::text::TextRenderer;
 use marduk_engine::text::FontId;
-use marduk_engine::window::{Runtime, RuntimeConfig};
+use marduk_engine::window::{Runtime, RuntimeConfig, WindowMode};
 
 use marduk_engine::coords::Vec2;
 
@@ -108,6 +108,7 @@ pub struct Application {
     width:          f64,
     height:         f64,
     zoom:           f32,
+    window_mode:    WindowMode,
     fonts:          Vec<(String, Vec<u8>)>,
     components:     Vec<(String, String)>,
     event_handlers: HashMap<String, Box<dyn FnMut()>>,
@@ -122,6 +123,7 @@ impl Application {
             width:          1280.0,
             height:         720.0,
             zoom:           1.0,
+            window_mode:    WindowMode::Windowed,
             fonts:          Vec::new(),
             components:     Vec::new(),
             event_handlers: HashMap::new(),
@@ -148,6 +150,16 @@ impl Application {
     /// below `0.25` or above `4.0` are clamped at render time.
     pub fn zoom(mut self, z: f32) -> Self {
         self.zoom = z;
+        self
+    }
+
+    /// Set the initial window presentation mode (default: `Windowed`).
+    ///
+    /// - `WindowMode::Windowed`   — normal resizable window
+    /// - `WindowMode::Maximized`  — fills the screen, OS title bar visible
+    /// - `WindowMode::Fullscreen` — borderless fullscreen, no title bar
+    pub fn window_mode(mut self, mode: WindowMode) -> Self {
+        self.window_mode = mode;
         self
     }
 
@@ -231,6 +243,7 @@ impl Application {
         let config = RuntimeConfig {
             title:        state.title.clone(),
             initial_size: LogicalSize::new(state.width, state.height),
+            window_mode:  state.window_mode,
         };
         Runtime::run(config, GpuInit::default(), state)
             .unwrap_or_else(|e| {
@@ -257,9 +270,10 @@ impl Default for Application {
 /// Everything engine-specific (renderers, FrameCtx) lives here.
 /// User code never sees this type.
 struct UiAppState {
-    title:  String,
-    width:  f64,
-    height: f64,
+    title:       String,
+    width:       f64,
+    height:      f64,
+    window_mode: WindowMode,
 
     // Zoom — adjusted at runtime via Ctrl+Scroll.
     zoom: f32,
@@ -293,6 +307,7 @@ impl UiAppState {
             title:                 app.title,
             width:                 app.width,
             height:                app.height,
+            window_mode:           app.window_mode,
             zoom:                  app.zoom,
             ui_scene,
             rect_renderer:         RectRenderer::new(),
@@ -319,6 +334,7 @@ impl UiAppState {
             title:                 app.title,
             width:                 app.width,
             height:                app.height,
+            window_mode:           app.window_mode,
             zoom:                  app.zoom,
             ui_scene,
             rect_renderer:         RectRenderer::new(),

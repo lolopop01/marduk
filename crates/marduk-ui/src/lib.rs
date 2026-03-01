@@ -45,6 +45,7 @@ pub mod constraints;
 
 // Top-level re-exports for the common entry point — `use marduk_ui::Application`
 pub use app::Application;
+pub use marduk_engine::window::WindowMode;
 pub mod dsl;
 pub mod event;
 pub mod painter;

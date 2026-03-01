@@ -53,8 +53,8 @@ Column {
                     corner_radius: 3
                     padding_top: 7
                     padding_bottom: 7
-                    padding_left: 16
-                    padding_right: 16
+                    padding_left: 4
+                    padding_right: 4
                     on_click: send_dispatch_note
                 }
 
@@ -70,8 +70,8 @@ Column {
                     corner_radius: 3
                     padding_top: 7
                     padding_bottom: 7
-                    padding_left: 16
-                    padding_right: 16
+                    padding_left: 4
+                    padding_right: 4
                     on_click: clear_dispatch_note
                 }
             }
