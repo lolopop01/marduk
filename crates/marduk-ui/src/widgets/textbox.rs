@@ -139,7 +139,7 @@ impl Widget for TextBox {
 
                 // Cursor — a thin vertical bar after the last character
                 if self.focused {
-                    let text_w = painter.font_system
+                    let text_w = painter
                         .measure_text(&self.text, font, self.font_size, None).x;
                     let cx = (inner.origin.x + text_w + 1.0).min(inner.origin.x + inner.size.x - 2.0);
                     painter.fill_rounded_rect(

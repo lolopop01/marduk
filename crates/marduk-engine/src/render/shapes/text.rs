@@ -465,18 +465,20 @@ impl TextRenderer {
         if self.sampler.is_some() {
             return;
         }
-        // Linear filtering for smooth rendering at non-integer zoom levels.
-        // The fringe/outline that linear sampling can cause (bleeding into the
-        // 1-px atlas padding) is prevented by rounding glyph quad edges to
-        // integer physical pixels: each fragment centre then maps to exactly
-        // one atlas texel centre at 1:1 scale, so no padding is sampled.
+        // Nearest filtering prevents the bilinear "border" artifact that occurs
+        // when the sampler straddles the glyph boundary in the atlas: linear
+        // sampling at uv_min/uv_max reads 50 % from the zero-filled padding,
+        // halving coverage at glyph edges and producing a visible dark fringe.
+        // Since glyphs are rasterised at the quantised physical scale (matching
+        // the display's pixel density), each atlas texel maps to ~1 screen pixel
+        // and Nearest gives the correct per-pixel coverage without interpolation.
         self.sampler = Some(ctx.device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("marduk text sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         }));

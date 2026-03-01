@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use winit::dpi::LogicalSize;
+use winit::window::Fullscreen;
 
 use marduk_engine::core::{App as EngineApp, AppControl, FrameCtx};
 use marduk_engine::device::GpuInit;
-use marduk_engine::input::MouseButton;
+use marduk_engine::input::{Key, MouseButton};
 use marduk_engine::render::shapes::circle::CircleRenderer;
 use marduk_engine::render::shapes::rect::RectRenderer;
 use marduk_engine::render::shapes::rounded_rect::RoundedRectRenderer;
@@ -379,6 +380,16 @@ impl EngineApp for UiAppState {
     fn on_frame(&mut self, ctx: &mut FrameCtx<'_, '_>) -> AppControl {
         let (w, h) = ctx.window.logical_size();
 
+        // ── F11 → toggle fullscreen ───────────────────────────────────────
+        if ctx.input_frame.keys_pressed.contains(&Key::F11) {
+            let is_fullscreen = ctx.window.window.fullscreen().is_some();
+            if is_fullscreen {
+                ctx.window.window.set_fullscreen(None);
+            } else {
+                ctx.window.window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+            }
+        }
+
         // ── Ctrl + Scroll → zoom ──────────────────────────────────────────
         let ctrl = ctx.input.modifiers.ctrl;
         let raw_scroll = ctx.input_frame.scroll_delta;
@@ -418,6 +429,12 @@ impl EngineApp for UiAppState {
             drag_origin:   self.drag_origin,
             drag_end,
         };
+
+        // ── Sync pixel_ratio for accurate text measurement ────────────────
+        // Same quantisation the TextRenderer uses for raster_scale.
+        let os_scale = ctx.window.window.scale_factor() as f32;
+        let raster_scale = (os_scale * self.zoom * 4.0).round() / 4.0;
+        self.ui_scene.pixel_ratio = raster_scale;
 
         // ── Layout + paint ────────────────────────────────────────────────
         match (&self.doc, &mut self.root) {

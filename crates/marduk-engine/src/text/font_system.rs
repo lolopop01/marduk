@@ -39,23 +39,47 @@ impl FontSystem {
     /// layout without needing direct access to `fontdue::Font`.
     #[must_use]
     pub fn measure_text(&self, text: &str, id: FontId, size: f32, max_width: Option<f32>) -> Vec2 {
+        self.measure_text_scaled(text, id, size, max_width, 1.0)
+    }
+
+    /// Like [`measure_text`] but performs the layout at `size * scale` and
+    /// divides the result back to logical pixels.
+    ///
+    /// Pass the same `scale` value the text renderer uses (`raster_scale =
+    /// os_scale * zoom`, quantised to 0.25 steps) so the returned width
+    /// matches the renderer's physical-pixel glyph positions exactly.  This
+    /// eliminates the cumulative per-character drift that arises when fontdue's
+    /// advances at different pixel sizes are not perfectly proportional.
+    #[must_use]
+    pub fn measure_text_scaled(
+        &self,
+        text: &str,
+        id: FontId,
+        size: f32,
+        max_width: Option<f32>,
+        scale: f32,
+    ) -> Vec2 {
         use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
 
         let Some(font) = self.get(id) else {
             return Vec2::new(0.0, size * 1.2);
         };
 
+        let scale = scale.max(0.01);
+        let phys_size = size * scale;
+        let phys_max = max_width.map(|w| w * scale);
+
         let mut layout: Layout<()> = Layout::new(CoordinateSystem::PositiveYDown);
-        layout.reset(&LayoutSettings { max_width, ..LayoutSettings::default() });
-        layout.append(&[font], &TextStyle::new(text, size, 0));
+        layout.reset(&LayoutSettings { max_width: phys_max, ..LayoutSettings::default() });
+        layout.append(&[font], &TextStyle::new(text, phys_size, 0));
 
         let glyphs = layout.glyphs();
         if glyphs.is_empty() {
             return Vec2::new(0.0, size * 1.2);
         }
 
-        let w = glyphs.iter().map(|g| g.x + g.width as f32).fold(0.0f32, f32::max);
-        let h = glyphs.iter().map(|g| g.y + g.height as f32).fold(size, f32::max);
+        let w = glyphs.iter().map(|g| g.x + g.width as f32).fold(0.0f32, f32::max) / scale;
+        let h = glyphs.iter().map(|g| g.y + g.height as f32).fold(phys_size, f32::max) / scale;
         Vec2::new(w, h)
     }
 }

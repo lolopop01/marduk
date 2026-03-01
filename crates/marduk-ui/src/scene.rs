@@ -69,11 +69,19 @@ pub struct UiScene {
     /// Public so callers can split-borrow it alongside `font_system` when
     /// passing both to engine renderers.
     pub draw_list: DrawList,
+    /// Physical-to-logical pixel ratio for text measurement.
+    ///
+    /// Set this each frame to `os_scale_factor × zoom` (quantised to 0.25
+    /// steps, matching the text renderer's `raster_scale`) **before** calling
+    /// [`frame`] or [`frame_ref`].  The [`Painter`] carries this value so
+    /// widgets can call [`Painter::measure_text`] and get widths that exactly
+    /// match what the renderer will draw.
+    pub pixel_ratio: f32,
 }
 
 impl UiScene {
     pub fn new() -> Self {
-        Self { font_system: FontSystem::new(), draw_list: DrawList::new() }
+        Self { font_system: FontSystem::new(), draw_list: DrawList::new(), pixel_ratio: 1.0 }
     }
 
     /// Load a TrueType / OpenType font from raw bytes.
@@ -104,6 +112,7 @@ impl UiScene {
                 &self.font_system,
                 input.mouse_pos,
                 input.mouse_pressed,
+                self.pixel_ratio,
             );
             root.paint(&mut painter, rect);
         }
@@ -172,6 +181,7 @@ impl UiScene {
                 &self.font_system,
                 input.mouse_pos,
                 input.mouse_pressed,
+                self.pixel_ratio,
             );
             root.paint(&mut painter, rect);
         }

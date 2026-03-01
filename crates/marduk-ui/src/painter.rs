@@ -13,6 +13,11 @@ use crate::constraints::LayoutCtx;
 pub struct Painter<'a> {
     pub(crate) draw_list: &'a mut DrawList,
     pub(crate) font_system: &'a FontSystem,
+    /// Physical-to-logical pixel ratio for this frame (os_scale × zoom).
+    ///
+    /// Use [`measure_text`] rather than `font_system.measure_text` so that
+    /// text width measurements match the renderer's physical-scale layout.
+    pub scale: f32,
     z: i32,
     /// Current mouse position in logical pixels.
     pub mouse_pos: Vec2,
@@ -26,8 +31,9 @@ impl<'a> Painter<'a> {
         font_system: &'a FontSystem,
         mouse_pos: Vec2,
         mouse_pressed: bool,
+        scale: f32,
     ) -> Self {
-        Self { draw_list, font_system, z: 0, mouse_pos, mouse_pressed }
+        Self { draw_list, font_system, scale, z: 0, mouse_pos, mouse_pressed }
     }
 
     // ── input queries ─────────────────────────────────────────────────────
@@ -42,6 +48,24 @@ impl<'a> Painter<'a> {
     #[inline]
     pub fn is_pressed(&self, rect: Rect) -> bool {
         self.mouse_pressed && rect.contains(self.mouse_pos)
+    }
+
+    // ── text measurement ──────────────────────────────────────────────────
+
+    /// Measures `text` at the renderer's current physical scale.
+    ///
+    /// Prefer this over `font_system.measure_text` inside widget `paint`
+    /// implementations: it lays out at `size × scale` and divides back, so
+    /// the returned width matches the positions the text renderer actually
+    /// places glyphs at, eliminating cursor-drift at HiDPI or non-1× zoom.
+    pub fn measure_text(
+        &self,
+        text: &str,
+        font: FontId,
+        size: f32,
+        max_width: Option<f32>,
+    ) -> Vec2 {
+        self.font_system.measure_text_scaled(text, font, size, max_width, self.scale)
     }
 
     // ── layout context ────────────────────────────────────────────────────
