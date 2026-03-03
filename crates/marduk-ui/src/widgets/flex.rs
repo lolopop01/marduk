@@ -181,7 +181,7 @@ impl Widget for Column {
         let fonts  = painter.font_system;
         let images = painter.image_store;
         let scale  = painter.scale;
-        let ctx = LayoutCtx { fonts, images, scale, focus: None };
+        let ctx = LayoutCtx { fonts, images, scale, focus: None, time_ms: 0 };
 
         let inner = inset_rect(rect, self.padding);
         let child_c = self.child_constraints(inner.size.x);
@@ -409,7 +409,7 @@ impl Widget for Row {
         let fonts  = painter.font_system;
         let images = painter.image_store;
         let scale  = painter.scale;
-        let ctx = LayoutCtx { fonts, images, scale, focus: None };
+        let ctx = LayoutCtx { fonts, images, scale, focus: None, time_ms: 0 };
 
         let inner   = inset_rect(rect, self.padding);
         let child_c = self.child_constraints(inner.size.y);

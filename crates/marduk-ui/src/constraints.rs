@@ -153,6 +153,11 @@ pub struct LayoutCtx<'a> {
     ///
     /// `None` in contexts that do not support focus (custom renderers, tests).
     pub focus: Option<&'a RefCell<FocusManager>>,
+    /// Monotonic application time in milliseconds (from app startup).
+    ///
+    /// Available in `on_event` for time-dependent widgets such as `Tooltip`.
+    /// Zero in layout-only contexts (`measure`, `paint`-internal layout).
+    pub time_ms: u64,
 }
 
 impl<'a> LayoutCtx<'a> {

@@ -1,0 +1,290 @@
+// Tools panel — exercises Combobox, NumberInput, Tooltip, and the Modal trigger
+Column {
+    padding_left: 20
+    padding_right: 20
+    padding_top: 16
+    padding_bottom: 28
+    gap: 12
+
+    // ── Driver assignment ─────────────────────────────────────────────
+    Text "// DRIVER ASSIGNMENT" {
+        font: body
+        size: 10
+        color: #4a4030ff
+    }
+
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 12
+
+            Row {
+                align: center
+                gap: 0
+                Text "Assign to TRK-004" { font: body  size: 11  color: #6a5e40ff }
+                Container { }
+                Combobox {
+                    id: assigned_driver
+                    font: body
+                    font_size: 12
+                    width: 200
+                    height: 30
+                    placeholder: "— select driver —"
+                    bg: #0e0d0bff
+                    border_color: #272420ff
+                    accent: #c8780aff
+                    corner_radius: 3
+                    on_change: driver_assigned
+                    Option "J. Okafor  (available)" { value: okafor }
+                    Option "L. Bergeron  (off-duty)" { value: bergeron }
+                    Option "P. Nguyen  (on break)" { value: nguyen }
+                    Option "S. Côté  (available)" { value: cote }
+                }
+            }
+
+            Row {
+                align: center
+                gap: 0
+                Text "Priority" { font: body  size: 11  color: #6a5e40ff }
+                Container { }
+                Combobox {
+                    id: route_priority
+                    font: body
+                    font_size: 12
+                    width: 160
+                    height: 30
+                    selected: normal
+                    bg: #0e0d0bff
+                    border_color: #272420ff
+                    accent: #c8780aff
+                    corner_radius: 3
+                    on_change: priority_changed
+                    Option "URGENT" { value: urgent }
+                    Option "Normal" { value: normal }
+                    Option "Low" { value: low }
+                }
+            }
+        }
+    }
+
+    // ── Load & speed limits ───────────────────────────────────────────
+    Text "// VEHICLE LIMITS" {
+        font: body
+        size: 10
+        color: #4a4030ff
+    }
+
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Column {
+            gap: 12
+
+            Row {
+                align: center
+                gap: 0
+                Text "Max load (kg)" { font: body  size: 11  color: #6a5e40ff }
+                Container { }
+                NumberInput {
+                    id: max_load_kg
+                    font: body
+                    font_size: 12
+                    value: 22000
+                    min: 0
+                    max: 40000
+                    step: 500
+                    decimals: 0
+                    width: 130
+                    height: 30
+                    bg: #0e0d0bff
+                    border_color: #272420ff
+                    accent: #c8780aff
+                    corner_radius: 3
+                    on_change: load_limit_changed
+                }
+            }
+
+            Row {
+                align: center
+                gap: 0
+                Text "Speed limit (km/h)" { font: body  size: 11  color: #6a5e40ff }
+                Container { }
+                NumberInput {
+                    id: speed_limit_kmh
+                    font: body
+                    font_size: 12
+                    value: 105
+                    min: 60
+                    max: 120
+                    step: 5
+                    decimals: 0
+                    width: 130
+                    height: 30
+                    bg: #0e0d0bff
+                    border_color: #272420ff
+                    accent: #c8780aff
+                    corner_radius: 3
+                    on_change: speed_limit_changed
+                }
+            }
+
+            Row {
+                align: center
+                gap: 0
+                Text "Rest stop interval (h)" { font: body  size: 11  color: #6a5e40ff }
+                Container { }
+                NumberInput {
+                    id: rest_interval_h
+                    font: body
+                    font_size: 12
+                    value: 4.5
+                    min: 2
+                    max: 8
+                    step: 0.5
+                    decimals: 1
+                    width: 130
+                    height: 30
+                    bg: #0e0d0bff
+                    border_color: #272420ff
+                    accent: #c8780aff
+                    corner_radius: 3
+                    on_change: rest_interval_changed
+                }
+            }
+        }
+    }
+
+    // ── Status badges with tooltips ───────────────────────────────────
+    Text "// SYSTEM STATUS (hover for details)" {
+        font: body
+        size: 10
+        color: #4a4030ff
+    }
+
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Row {
+            gap: 12
+            align: center
+
+            Tooltip "GPS: 14 satellites locked  ·  Accuracy ±3 m  ·  Last fix 0.8 s ago" {
+                id: tt_gps
+                font: body
+                delay_ms: 400
+                Container {
+                    bg: #0e2208ff
+                    corner_radius: 3
+                    padding_top: 5
+                    padding_bottom: 5
+                    padding_left: 10
+                    padding_right: 10
+                    Text "GPS  ●" { font: body  size: 11  color: #4a9a30ff }
+                }
+            }
+
+            Tooltip "SMS gateway: connected  ·  Queue: 0 messages  ·  Provider: Telus" {
+                id: tt_sms
+                font: body
+                delay_ms: 400
+                Container {
+                    bg: #0e2208ff
+                    corner_radius: 3
+                    padding_top: 5
+                    padding_bottom: 5
+                    padding_left: 10
+                    padding_right: 10
+                    Text "SMS  ●" { font: body  size: 11  color: #4a9a30ff }
+                }
+            }
+
+            Tooltip "Fuel API: last sync 4 min ago  ·  3 stations in range" {
+                id: tt_fuel
+                font: body
+                delay_ms: 400
+                Container {
+                    bg: #221800ff
+                    corner_radius: 3
+                    padding_top: 5
+                    padding_bottom: 5
+                    padding_left: 10
+                    padding_right: 10
+                    Text "FUEL  ⚠" { font: body  size: 11  color: #c8780aff }
+                }
+            }
+
+            Tooltip "Telematics server: 2 units unreachable  ·  TRK-003 TRK-004" {
+                id: tt_telem
+                font: body
+                delay_ms: 400
+                Container {
+                    bg: #200808ff
+                    corner_radius: 3
+                    padding_top: 5
+                    padding_bottom: 5
+                    padding_left: 10
+                    padding_right: 10
+                    Text "TELEM  ✕" { font: body  size: 11  color: #c03020ff }
+                }
+            }
+        }
+    }
+
+    // ── Emergency stop ────────────────────────────────────────────────
+    Text "// EMERGENCY CONTROLS" {
+        font: body
+        size: 10
+        color: #4a4030ff
+    }
+
+    Container {
+        bg: #161512ff
+        border_width: 1
+        border_color: #272420ff
+        corner_radius: 3
+        padding: 14
+
+        Row {
+            align: center
+            gap: 12
+
+            Text "Halt all active routes immediately." {
+                font: body
+                size: 11
+                color: #6a5e40ff
+            }
+
+            Container { }
+
+            Button "⚠  EMERGENCY STOP" {
+                font: body
+                font_size: 12
+                text_color: #c03020ff
+                bg: #200808ff
+                hover_bg: #2e0c0cff
+                press_bg: #3c1010ff
+                border_width: 1
+                border_color: #c0302044
+                corner_radius: 3
+                padding_top: 8
+                padding_bottom: 8
+                padding_left: 16
+                padding_right: 16
+                on_click: open_emergency
+            }
+        }
+    }
+}

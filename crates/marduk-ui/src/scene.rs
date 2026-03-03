@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use marduk_engine::coords::{Rect, Vec2};
 use marduk_engine::image::{ImageId, ImageStore};
@@ -38,6 +39,10 @@ pub struct UiInput {
     /// Set to `Some(start)` for the single frame in which a drag ends (button released).
     /// Used to dispatch `DragEnd` so widgets can commit regardless of release position.
     pub drag_end: Option<Vec2>,
+    /// Monotonic application time in milliseconds (from app startup).
+    ///
+    /// Used by time-dependent widgets (e.g. `Tooltip`) to measure hover duration.
+    pub time_ms: u64,
 }
 
 // ── UiScene ───────────────────────────────────────────────────────────────
@@ -90,6 +95,13 @@ pub struct UiScene {
     /// Tab-key cycling. Wrapped in `RefCell` so widgets can request focus
     /// through the shared `&LayoutCtx` during event routing.
     pub focus: RefCell<FocusManager>,
+    /// Overlay rect registry populated by widgets during each paint pass.
+    ///
+    /// Cleared at the start of every frame.  Widgets with open popups call
+    /// `painter.register_overlay(rect)` to push their popup rect here.
+    /// After paint, the event-routing phase uses this list to dispatch
+    /// `OverlayDismiss` when a click misses all registered overlay rects.
+    overlay_rects: Rc<RefCell<Vec<Rect>>>,
 }
 
 impl UiScene {
@@ -100,6 +112,7 @@ impl UiScene {
             draw_list: DrawList::new(),
             pixel_ratio: 1.0,
             focus: RefCell::new(FocusManager::new()),
+            overlay_rects: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
@@ -141,6 +154,7 @@ impl UiScene {
         input: &UiInput,
     ) -> &mut DrawList {
         self.draw_list.clear();
+        self.overlay_rects.borrow_mut().clear();
 
         // ── Tab / Escape: advance or clear focus before the paint pass ────
         // This ensures the paint pass sees the correct focus state.
@@ -158,6 +172,7 @@ impl UiScene {
             images: &self.image_store,
             scale: self.pixel_ratio,
             focus: None,
+            time_ms: input.time_ms,
         };
         let _ = root.measure(Constraints::loose(viewport), &ctx);
         let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
@@ -171,7 +186,9 @@ impl UiScene {
                 input.mouse_pos,
                 input.mouse_pressed,
                 self.pixel_ratio,
-            ).with_focus(&self.focus);
+                input.time_ms,
+            ).with_focus(&self.focus)
+             .with_overlays(Rc::clone(&self.overlay_rects));
             root.paint(&mut painter, rect);
         }
 
@@ -182,6 +199,7 @@ impl UiScene {
                 images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
+                time_ms: input.time_ms,
             };
             root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
             if let Some(start) = input.drag_origin {
@@ -191,7 +209,15 @@ impl UiScene {
                 root.on_event(&UiEvent::DragEnd { pos: input.mouse_pos, start }, rect, &ctx);
             }
             if input.mouse_clicked {
-                root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+                let overlays = self.overlay_rects.borrow();
+                if !overlays.is_empty() && !overlays.iter().any(|r| r.contains(input.mouse_pos)) {
+                    // Click outside all overlays → dismiss them instead.
+                    drop(overlays);
+                    root.on_event(&UiEvent::OverlayDismiss, rect, &ctx);
+                } else {
+                    drop(overlays);
+                    root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+                }
             }
             for text in &input.text_input {
                 root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);
@@ -212,6 +238,7 @@ impl UiScene {
                 images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
+                time_ms: input.time_ms,
             };
             if self.focus.borrow().just_gained().is_some() {
                 root.on_event(&UiEvent::FocusGained, rect, &ctx);
@@ -263,6 +290,7 @@ impl UiScene {
         input: &UiInput,
     ) -> &mut DrawList {
         self.draw_list.clear();
+        self.overlay_rects.borrow_mut().clear();
 
         // ── Tab / Escape: advance or clear focus before the paint pass ────
         for key in &input.keys_pressed {
@@ -279,9 +307,8 @@ impl UiScene {
             images: &self.image_store,
             scale: self.pixel_ratio,
             focus: None,
+            time_ms: input.time_ms,
         };
-        // Pre-pass: let children compute their natural sizes. The root itself
-        // always occupies the full viewport, so its measured size is unused.
         let _ = root.measure(Constraints::loose(viewport), &ctx);
         let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
 
@@ -294,7 +321,9 @@ impl UiScene {
                 input.mouse_pos,
                 input.mouse_pressed,
                 self.pixel_ratio,
-            ).with_focus(&self.focus);
+                input.time_ms,
+            ).with_focus(&self.focus)
+             .with_overlays(Rc::clone(&self.overlay_rects));
             root.paint(&mut painter, rect);
         }
 
@@ -305,6 +334,7 @@ impl UiScene {
                 images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
+                time_ms: input.time_ms,
             };
             root.on_event(&UiEvent::Hover { pos: input.mouse_pos }, rect, &ctx);
             if let Some(start) = input.drag_origin {
@@ -314,7 +344,14 @@ impl UiScene {
                 root.on_event(&UiEvent::DragEnd { pos: input.mouse_pos, start }, rect, &ctx);
             }
             if input.mouse_clicked {
-                root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+                let overlays = self.overlay_rects.borrow();
+                if !overlays.is_empty() && !overlays.iter().any(|r| r.contains(input.mouse_pos)) {
+                    drop(overlays);
+                    root.on_event(&UiEvent::OverlayDismiss, rect, &ctx);
+                } else {
+                    drop(overlays);
+                    root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
+                }
             }
             for text in &input.text_input {
                 root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);
@@ -335,6 +372,7 @@ impl UiScene {
                 images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
+                time_ms: input.time_ms,
             };
             if self.focus.borrow().just_gained().is_some() {
                 root.on_event(&UiEvent::FocusGained, rect, &ctx);

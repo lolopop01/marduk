@@ -227,7 +227,7 @@ impl Widget for Stack {
         let fonts  = painter.font_system;
         let images = painter.image_store;
         let scale  = painter.scale;
-        let ctx = LayoutCtx { fonts, images, scale, focus: None };
+        let ctx = LayoutCtx { fonts, images, scale, focus: None, time_ms: 0 };
 
         for item in &self.children {
             let child_rect = item.compute_rect(rect, &ctx);

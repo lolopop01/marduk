@@ -31,6 +31,12 @@ pub enum UiEvent {
     FocusGained,
     /// Keyboard focus was lost.
     FocusLost,
+    /// The user clicked outside every registered overlay region this frame.
+    ///
+    /// Dispatched instead of `Click` when overlays are active and the click
+    /// position misses all overlay rects.  Widgets that own open popups
+    /// (Combobox, Modal, etc.) should consume this to close themselves.
+    OverlayDismiss,
 }
 
 /// Result returned by [`Widget::on_event`].

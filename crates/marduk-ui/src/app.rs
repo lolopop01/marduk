@@ -342,6 +342,9 @@ struct UiAppState {
     svg_sources: Vec<(ImageId, Vec<u8>)>,
     /// The `raster_scale` at which SVGs were last rasterized.
     last_raster_scale: f32,
+
+    /// App start time for monotonic `time_ms` in [`UiInput`].
+    start_time: std::time::Instant,
 }
 
 impl UiAppState {
@@ -367,6 +370,7 @@ impl UiAppState {
             drag_origin:           None,
             svg_sources,
             last_raster_scale:     0.0, // force re-rasterize on first frame
+            start_time:            std::time::Instant::now(),
         }
     }
 
@@ -400,6 +404,7 @@ impl UiAppState {
             drag_origin:           None,
             svg_sources,
             last_raster_scale:     0.0,
+            start_time:            std::time::Instant::now(),
         }
     }
 
@@ -517,6 +522,7 @@ impl EngineApp for UiAppState {
             drag_origin:   self.drag_origin,
             drag_end,
             modifiers:     ctx.input.modifiers,
+            time_ms:       self.start_time.elapsed().as_millis() as u64,
         };
 
         // ── Sync pixel_ratio for accurate text measurement ────────────────

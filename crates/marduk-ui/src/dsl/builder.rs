@@ -30,17 +30,23 @@ use crate::widget::Element;
 use crate::widgets::{
     button::Button,
     checkbox::Checkbox,
+    combobox::Combobox,
     container::Container,
     flex::{Align, Column, Row},
     image::{Image, ImageFit},
+    modal::Modal,
+    number_input::NumberInput,
     progress::ProgressBar,
     radio::RadioGroup,
     scroll::ScrollView,
     slider::Slider,
+    splitter::{SplitDirection, Splitter},
     stack::{AnchorVal, SizeHint, Stack, StackItem},
+    tabs::Tabs,
     text::Text,
     textbox::TextBox,
     toggle::Toggle,
+    tooltip::Tooltip,
 };
 
 // ── WidgetStateValue ──────────────────────────────────────────────────────
@@ -179,6 +185,12 @@ impl DslLoader {
             "ScrollView"  => self.build_scroll_view(node, bindings),
             "Stack"       => self.build_stack(node, bindings),
             "Image"       => self.build_image(node, bindings),
+            "Tabs"        => self.build_tabs(node, bindings),
+            "Splitter"    => self.build_splitter(node, bindings),
+            "NumberInput" => self.build_number_input(node, bindings),
+            "Tooltip"     => self.build_tooltip(node, bindings),
+            "Modal"       => self.build_modal(node, bindings),
+            "Combobox"    => self.build_combobox(node, bindings),
             alias => {
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
@@ -765,6 +777,347 @@ impl DslLoader {
         }
 
         img.into()
+    }
+
+    // ── Tabs ──────────────────────────────────────────────────────────────
+
+    fn build_tabs(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let default_sel = node.prop_f32("selected").map(|v| v as usize).unwrap_or(0);
+        let selected = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Float(v)) => *v as usize,
+                _ => default_sel,
+            }
+        } else {
+            default_sel
+        };
+
+        let mut tabs = Tabs::new().selected(selected);
+
+        if let Some(font) = self.resolve_font(node, bindings) { tabs = tabs.font(font); }
+        if let Some(v) = node.prop_f32("font_size")           { tabs = tabs.font_size(v); }
+        if let Some(v) = node.prop_f32("tab_height")          { tabs = tabs.tab_height(v); }
+        if let Some(v) = node.engine_color("active_color")    { tabs = tabs.active_color(v); }
+        if let Some(v) = node.engine_color("inactive_color")  { tabs = tabs.inactive_color(v); }
+        if let Some(v) = node.engine_color("indicator_color").or_else(|| node.engine_color("accent")) {
+            tabs = tabs.indicator_color(v);
+        }
+
+        // Each Tab child: Tab "Label" { ... content ... }
+        for child in &node.children {
+            if child.widget == "Tab" {
+                let label   = child.content.clone().unwrap_or_default();
+                let content = if let Some(inner) = child.children.first() {
+                    self.build_node(inner, bindings)
+                } else {
+                    Container::new().into()
+                };
+                tabs = tabs.tab(label, content);
+            }
+        }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            tabs = tabs.on_change(move |i| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(i as f32));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        tabs.into()
+    }
+
+    // ── Splitter ──────────────────────────────────────────────────────────
+
+    fn build_splitter(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let default_ratio = node.prop_f32("ratio").unwrap_or(0.5);
+        let ratio = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Float(v)) => *v,
+                _ => default_ratio,
+            }
+        } else {
+            default_ratio
+        };
+
+        let mut children = node.children.iter();
+        let first: Element = children.next()
+            .map(|c| self.build_node(c, bindings))
+            .unwrap_or_else(|| Container::new().into());
+        let second: Element = children.next()
+            .map(|c| self.build_node(c, bindings))
+            .unwrap_or_else(|| Container::new().into());
+
+        let direction = match node.prop_str("direction").unwrap_or("horizontal") {
+            "vertical" | "v" => SplitDirection::Vertical,
+            _                => SplitDirection::Horizontal,
+        };
+
+        let mut sp = match direction {
+            SplitDirection::Horizontal => Splitter::horizontal(first, second),
+            SplitDirection::Vertical   => Splitter::vertical(first, second),
+        }
+        .initial_ratio(ratio);
+
+        if let Some(v) = node.prop_f32("min_first")   { sp = sp.min_first(v); }
+        if let Some(v) = node.prop_f32("min_second")  { sp = sp.min_second(v); }
+        if let Some(v) = node.prop_f32("handle_size") { sp = sp.handle_size(v); }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            sp = sp.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        sp.into()
+    }
+
+    // ── NumberInput ───────────────────────────────────────────────────────
+
+    fn build_number_input(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let default_val = node.prop_f32("value").map(|v| v as f64).unwrap_or(0.0);
+        let value = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Float(v)) => *v as f64,
+                _ => default_val,
+            }
+        } else {
+            default_val
+        };
+
+        let mut ni = NumberInput::new().value(value);
+
+        if let Some(v) = node.prop_f32("min")        { ni = ni.min(v as f64); }
+        if let Some(v) = node.prop_f32("max")        { ni = ni.max(v as f64); }
+        if let Some(v) = node.prop_f32("step")       { ni = ni.step(v as f64); }
+        if let Some(v) = node.prop_f32("decimals")   { ni = ni.decimals(v as usize); }
+        if let Some(v) = node.prop_f32("width")      { ni = ni.width(v); }
+        if let Some(v) = node.prop_f32("height")     { ni = ni.height(v); }
+        if let Some(font) = self.resolve_font(node, bindings) { ni = ni.font(font); }
+        if let Some(v) = node.prop_f32("font_size")  { ni = ni.font_size(v); }
+        if let Some(v) = node.engine_color("text_color").or_else(|| node.engine_color("color")) {
+            ni = ni.text_color(v);
+        }
+        if let Some(v) = node.engine_color("bg")            { ni = ni.bg(v); }
+        if let Some(v) = node.engine_color("border_color")  { ni = ni.border_color(v); }
+        if let Some(v) = node.engine_color("focused_border_color").or_else(|| node.engine_color("accent")) {
+            ni = ni.focused_border_color(v);
+        }
+        if let Some(v) = node.prop_f32("corner_radius") { ni = ni.corner_radius(v); }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            ni = ni.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(v as f32));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        ni.into()
+    }
+
+    // ── Tooltip ───────────────────────────────────────────────────────────
+
+    fn build_tooltip(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
+            .map(|s| s.to_string());
+
+        // Restore hover_since_ms from widget_state (stored under "{id}::hover").
+        let hover_key = state_key.as_deref().map(|k| format!("{k}::hover"));
+        let hover_since = hover_key.as_deref()
+            .and_then(|k| bindings.widget_state.borrow().get(k).and_then(|v| {
+                if let WidgetStateValue::Float(ms) = v { Some(*ms as u64) } else { None }
+            }));
+
+        let text = node.content.clone()
+            .or_else(|| node.prop_str("text").map(|s| s.to_string()))
+            .unwrap_or_default();
+
+        let child: Element = node.children.first()
+            .map(|c| self.build_node(c, bindings))
+            .unwrap_or_else(|| Container::new().into());
+
+        let mut tt = Tooltip::new(child)
+            .text(text)
+            .hover_since_ms(hover_since);
+
+        if let Some(v) = node.prop_f32("delay_ms").map(|v| v as u64) { tt = tt.delay_ms(v); }
+        if let Some(font) = self.resolve_font(node, bindings)          { tt = tt.font(font); }
+        if let Some(v) = node.prop_f32("font_size")                    { tt = tt.font_size(v); }
+        if let Some(v) = node.engine_color("text_color").or_else(|| node.engine_color("color")) {
+            tt = tt.text_color(v);
+        }
+        if let Some(v) = node.engine_color("bg") { tt = tt.bg(v); }
+
+        // Persist hover state across DSL frame rebuilds.
+        if let Some(key) = hover_key {
+            let state = Rc::clone(&bindings.widget_state);
+            tt = tt.on_hover_change(move |hovering, timestamp| {
+                if hovering {
+                    state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(timestamp as f32));
+                } else {
+                    state.borrow_mut().remove(&key);
+                }
+            });
+        }
+
+        tt.into()
+    }
+
+    // ── Modal ─────────────────────────────────────────────────────────────
+
+    fn build_modal(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
+            .map(|s| s.to_string());
+
+        let default_open = node.prop_f32("open").map(|v| v != 0.0).unwrap_or(false);
+        let open = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Bool(b)) => *b,
+                _ => default_open,
+            }
+        } else {
+            default_open
+        };
+
+        let child: Element = node.children.first()
+            .map(|c| self.build_node(c, bindings))
+            .unwrap_or_else(|| Container::new().into());
+
+        let mut m = Modal::new(open).child(child);
+
+        if let Some(v) = node.prop_str("title")     { m = m.title(v.to_string()); }
+        if let Some(v) = node.prop_f32("max_width")  { m = m.max_width(v); }
+        if let Some(font) = self.resolve_font(node, bindings) { m = m.font(font); }
+        if let Some(v) = node.prop_f32("font_size")  { m = m.font_size(v); }
+        if let Some(v) = node.engine_color("bg")               { m = m.bg(v); }
+        if let Some(v) = node.engine_color("backdrop_color")   { m = m.backdrop_color(v); }
+        if let Some(v) = node.prop_f32("corner_radius")        { m = m.corner_radius(v); }
+
+        if let Some(event_name) = node.prop_str("on_dismiss") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            m = m.on_dismiss(move || {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Bool(false));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        m.into()
+    }
+
+    // ── Combobox ──────────────────────────────────────────────────────────
+
+    fn build_combobox(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let state_key = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let default_sel = node.prop_str("selected")
+            .or_else(|| node.prop_str("value"))
+            .map(|s| s.to_string());
+        let selected = if let Some(key) = &state_key {
+            match bindings.widget_state.borrow().get(key.as_str()) {
+                Some(WidgetStateValue::Str(s)) => Some(s.clone()),
+                _ => default_sel,
+            }
+        } else {
+            default_sel
+        };
+
+        // Restore open state.
+        let open_key = state_key.as_deref().map(|k| format!("{k}::open"));
+        let open = open_key.as_deref()
+            .and_then(|k| bindings.widget_state.borrow().get(k).and_then(|v| {
+                if let WidgetStateValue::Bool(b) = v { Some(*b) } else { None }
+            }))
+            .unwrap_or(false);
+
+        let mut cb = Combobox::new().open(open);
+        if let Some(s) = selected { cb = cb.selected(s); }
+
+        if let Some(v) = node.prop_str("placeholder")  { cb = cb.placeholder(v.to_string()); }
+        if let Some(font) = self.resolve_font(node, bindings) { cb = cb.font(font); }
+        if let Some(v) = node.prop_f32("font_size")    { cb = cb.font_size(v); }
+        if let Some(v) = node.prop_f32("width")        { cb = cb.width(v); }
+        if let Some(v) = node.prop_f32("height")       { cb = cb.height(v); }
+        if let Some(v) = node.prop_f32("corner_radius")       { cb = cb.corner_radius(v); }
+        if let Some(v) = node.prop_f32("max_dropdown_height") { cb = cb.max_dropdown_height(v); }
+        if let Some(v) = node.engine_color("text_color").or_else(|| node.engine_color("color")) {
+            cb = cb.text_color(v);
+        }
+        if let Some(v) = node.engine_color("bg")                    { cb = cb.bg(v); }
+        if let Some(v) = node.engine_color("border_color")          { cb = cb.border_color(v); }
+        if let Some(v) = node.engine_color("focused_border_color").or_else(|| node.engine_color("accent")) {
+            cb = cb.focused_border_color(v);
+        }
+        if let Some(v) = node.engine_color("item_bg")       { cb = cb.item_bg(v); }
+        if let Some(v) = node.engine_color("item_hover_bg") { cb = cb.item_hover_bg(v); }
+
+        // Options from child nodes: Option "Label" { value: some_val }
+        for child in &node.children {
+            if child.widget == "Option" {
+                let label = child.content.clone().unwrap_or_default();
+                let value = child.prop_str("value").unwrap_or(&label).to_string();
+                cb = cb.option(label, value);
+            }
+        }
+
+        // Persist open/close state.
+        if let Some(okey) = open_key {
+            let state = Rc::clone(&bindings.widget_state);
+            cb = cb.on_open_change(move |v| {
+                if v {
+                    state.borrow_mut().insert(okey.clone(), WidgetStateValue::Bool(v));
+                } else {
+                    state.borrow_mut().remove(&okey);
+                }
+            });
+        }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue = Rc::clone(&bindings.event_queue);
+            let state = Rc::clone(&bindings.widget_state);
+            let key   = state_key.unwrap_or_else(|| event_name.to_string());
+            let name  = event_name.to_string();
+            cb = cb.on_change(move |v| {
+                state.borrow_mut().insert(key.clone(), WidgetStateValue::Str(v));
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        cb.into()
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

@@ -14,20 +14,22 @@ fn main() {
 
     Application::new()
         .title("Redline Logistics — Depot YUL-WEST")
-        .size(620.0, 500.0)
-        .zoom(1.0)               // Ctrl+Scroll to adjust at runtime
+        .size(800.0, 600.0)
+        .zoom(1.0)
         .window_mode(WindowMode::Fullscreen)
         .font("body", load_font())
-        // ── test images ───────────────────────────────────────────────────
+        // ── images ────────────────────────────────────────────────────────
         .image("truck_icon", truck_icon_svg())
         // ── components ────────────────────────────────────────────────────
-        .component("Header",   include_str!("../ui/header.mkml"))
-        .component("Fleet",    include_str!("../ui/components/fleet.mkml"))
-        .component("Dispatch", include_str!("../ui/components/dispatch.mkml"))
-        // ── scroll ────────────────────────────────────────────────────────
-        .on_event("main_scroll", || {})
-        // ── dispatch ──────────────────────────────────────────────────────
-        .on_event("dispatch_note_changed", || {})
+        .component("Header",  include_str!("../ui/header.mkml"))
+        .component("Fleet",   include_str!("../ui/components/fleet.mkml"))
+        .component("Dispatch",include_str!("../ui/components/dispatch.mkml"))
+        .component("Routing", include_str!("../ui/components/routing.mkml"))
+        .component("Tools",   include_str!("../ui/components/tools.mkml"))
+        // ── OPS tab ───────────────────────────────────────────────────────
+        .on_event("main_scroll",              || {})
+        .on_event("main_tab_changed",         || {})
+        .on_event("dispatch_note_changed",    || {})
         .on_event("send_dispatch_note", || {
             println!();
             println!("  [DISPATCH] Note queued for transmission.");
@@ -38,13 +40,33 @@ fn main() {
             state.clear("dispatch_note");
             println!("  [DISPATCH] Note cleared.");
         })
-        // ── slider ────────────────────────────────────────────────────────
-        .on_event("fuel_threshold_changed", || println!("  [CFG] Fuel warning threshold updated."))
-        // ── toggles ───────────────────────────────────────────────────────
-        .on_event("gps_toggled",            || println!("  [SYS] GPS tracking toggled."))
-        .on_event("sms_toggled",            || println!("  [SYS] SMS alerts toggled."))
-        // ── checkbox ──────────────────────────────────────────────────────
-        .on_event("load_photo_toggled",     || println!("  [CFG] Load photo requirement toggled."))
+        .on_event("fuel_threshold_changed",   || println!("  [CFG] Fuel warning threshold updated."))
+        .on_event("gps_toggled",              || println!("  [SYS] GPS tracking toggled."))
+        .on_event("sms_toggled",              || println!("  [SYS] SMS alerts toggled."))
+        .on_event("load_photo_toggled",       || println!("  [CFG] Load photo requirement toggled."))
+        // ── ROUTING tab (Splitter) ─────────────────────────────────────────
+        .on_event("route_split_changed",      || {})
+        // ── TOOLS tab (Combobox / NumberInput / Modal) ─────────────────────
+        .on_event("tools_scroll",             || {})
+        .on_event("driver_assigned", || println!("  [ASSIGN] Driver assigned to TRK-004."))
+        .on_event("priority_changed",         || println!("  [ASSIGN] Route priority updated."))
+        .on_event("load_limit_changed",       || println!("  [LIMITS] Max load updated."))
+        .on_event("speed_limit_changed",      || println!("  [LIMITS] Speed limit updated."))
+        .on_event("rest_interval_changed",    || println!("  [LIMITS] Rest interval updated."))
+        // ── Modal ──────────────────────────────────────────────────────────
+        .on_event_state("open_emergency", |state| {
+            state.set_bool("emergency_modal", true);
+        })
+        .on_event_state("dismiss_emergency", |state| {
+            state.set_bool("emergency_modal", false);
+        })
+        .on_event_state("confirm_emergency", |state| {
+            state.set_bool("emergency_modal", false);
+            println!();
+            println!("  [EMERGENCY] *** HALT SIGNAL SENT TO ALL ACTIVE ROUTES ***");
+            println!("  [EMERGENCY] TRK-001 TRK-002 TRK-003 — drivers notified.");
+            println!();
+        })
         .run(include_str!("../ui/main.mkml"))
 }
 

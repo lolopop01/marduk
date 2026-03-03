@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use marduk_engine::coords::{CornerRadii, Rect, Vec2};
 use marduk_engine::image::{ImageId, ImageStore};
@@ -33,6 +34,13 @@ pub struct Painter<'a> {
     /// Stored as a `RefCell` reference so focus state can be mutated through the
     /// shared `&Painter` reference that widget paint implementations receive.
     focus: Option<&'a RefCell<FocusManager>>,
+    /// Overlay rect registry shared with `UiScene`.
+    ///
+    /// Widgets with open popups call [`register_overlay`] to declare the popup
+    /// rect.  After paint, the scene uses this list for click-routing decisions.
+    overlays: Option<Rc<RefCell<Vec<Rect>>>>,
+    /// Monotonic application time in milliseconds. Matches [`UiInput::time_ms`].
+    pub time_ms: u64,
 }
 
 impl<'a> Painter<'a> {
@@ -43,12 +51,29 @@ impl<'a> Painter<'a> {
         mouse_pos: Vec2,
         mouse_pressed: bool,
         scale: f32,
+        time_ms: u64,
     ) -> Self {
-        Self { draw_list, font_system, image_store, scale, z: 0, mouse_pos, mouse_pressed, focus: None }
+        Self {
+            draw_list,
+            font_system,
+            image_store,
+            scale,
+            z: 0,
+            mouse_pos,
+            mouse_pressed,
+            focus: None,
+            overlays: None,
+            time_ms,
+        }
     }
 
     pub(crate) fn with_focus(mut self, focus: &'a RefCell<FocusManager>) -> Self {
         self.focus = Some(focus);
+        self
+    }
+
+    pub(crate) fn with_overlays(mut self, overlays: Rc<RefCell<Vec<Rect>>>) -> Self {
+        self.overlays = Some(overlays);
         self
     }
 
@@ -116,6 +141,32 @@ impl<'a> Painter<'a> {
         self.font_system.measure_text_scaled(text, font, size, max_width, self.scale)
     }
 
+    // ── overlay ───────────────────────────────────────────────────────────
+
+    /// Register `rect` as an overlay region for this frame.
+    ///
+    /// When overlays are registered, a click that falls **outside** all overlay
+    /// rects dispatches [`UiEvent::OverlayDismiss`] rather than
+    /// [`UiEvent::Click`].  Widgets that own open popups should consume
+    /// `OverlayDismiss` to close themselves.
+    pub fn register_overlay(&mut self, rect: Rect) {
+        if let Some(overlays) = &self.overlays {
+            overlays.borrow_mut().push(rect);
+        }
+    }
+
+    /// Execute `f` with the Z-index boosted to the overlay layer.
+    ///
+    /// All draw calls inside `f` will appear above all regular widget content.
+    /// The Z-index is restored after `f` returns so subsequent non-overlay
+    /// draws remain at normal depth.
+    pub fn overlay_scope(&mut self, f: impl FnOnce(&mut Painter)) {
+        let old_z = self.z;
+        self.z = 100_000;
+        f(self);
+        self.z = old_z;
+    }
+
     // ── layout context ────────────────────────────────────────────────────
 
     /// Returns a [`LayoutCtx`] borrowing this painter's font and image stores.
@@ -124,7 +175,13 @@ impl<'a> Painter<'a> {
     /// its children to compute their layout positions.
     #[inline]
     pub fn layout_ctx(&self) -> LayoutCtx<'_> {
-        LayoutCtx { fonts: self.font_system, images: self.image_store, scale: self.scale, focus: None }
+        LayoutCtx {
+            fonts: self.font_system,
+            images: self.image_store,
+            scale: self.scale,
+            focus: None,
+            time_ms: self.time_ms,
+        }
     }
 
     // ── drawing ───────────────────────────────────────────────────────────

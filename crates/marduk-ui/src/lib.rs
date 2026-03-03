@@ -66,18 +66,24 @@ pub mod prelude {
     pub use crate::widgets::{
         button::Button,
         checkbox::Checkbox,
+        combobox::Combobox,
         container::Container,
         flex::{Align, Column, Row},
         image::{Image, ImageFit},
+        modal::Modal,
+        number_input::NumberInput,
         progress::ProgressBar,
         radio::{RadioGroup, RadioOption},
         scroll::ScrollView,
         slider::Slider,
+        splitter::{SplitDirection, Splitter},
         stack::{AnchorVal, SizeHint, Stack, StackItem},
+        tabs::Tabs,
         text::Text,
         text_edit::TextEditState,
         textbox::TextBox,
         toggle::Toggle,
+        tooltip::Tooltip,
     };
 
     // Re-export the engine primitives everyone needs.
