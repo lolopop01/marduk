@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use marduk_engine::coords::{Rect, Vec2};
+use marduk_engine::image::ImageStore;
 use marduk_engine::text::FontSystem;
 
 use crate::focus::{FocusId, FocusManager};
@@ -142,6 +143,8 @@ impl Constraints {
 /// interact with the focus system without owning those resources.
 pub struct LayoutCtx<'a> {
     pub fonts: &'a FontSystem,
+    /// Image store — widgets query natural image dimensions during measure.
+    pub images: &'a ImageStore,
     /// Physical-to-logical pixel ratio (os_scale × zoom), matching the text
     /// renderer's `raster_scale`.  Pass this to `fonts.measure_text_scaled` so
     /// that measured widths exactly match what the renderer will draw.

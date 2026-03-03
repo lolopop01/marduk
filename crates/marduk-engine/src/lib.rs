@@ -10,7 +10,10 @@ pub mod core;
 
 pub mod logging;
 pub mod coords;
+pub mod image;
 pub mod render;
 pub mod paint;
 pub mod scene;
 pub mod text;
+
+pub use image::{ImageId, ImageStore};

@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use marduk_engine::coords::{Rect, Vec2};
+use marduk_engine::image::{ImageId, ImageStore};
 use marduk_engine::input::{Key, Modifiers};
 use marduk_engine::scene::DrawList;
 use marduk_engine::text::{FontId, FontSystem};
@@ -69,6 +70,9 @@ pub struct UiScene {
     /// Fonts are public so the application can pass `&ui.font_system` to the
     /// engine's `TextRenderer::render`.
     pub font_system: FontSystem,
+    /// Images are public so the application can pass `&ui.image_store` to the
+    /// engine's `ImageRenderer::render`.
+    pub image_store: ImageStore,
     /// Draw list populated by the most recent [`frame`] call.
     ///
     /// Public so callers can split-borrow it alongside `font_system` when
@@ -92,6 +96,7 @@ impl UiScene {
     pub fn new() -> Self {
         Self {
             font_system: FontSystem::new(),
+            image_store: ImageStore::new(),
             draw_list: DrawList::new(),
             pixel_ratio: 1.0,
             focus: RefCell::new(FocusManager::new()),
@@ -101,6 +106,26 @@ impl UiScene {
     /// Load a TrueType / OpenType font from raw bytes.
     pub fn load_font(&mut self, data: &[u8]) -> Result<FontId, marduk_engine::text::FontLoadError> {
         self.font_system.load_font(data)
+    }
+
+    /// Store premultiplied RGBA8 pixel data where logical size == physical size.
+    ///
+    /// Use this for raster images. For SVGs use [`load_image_scaled`].
+    pub fn load_image(&mut self, pixels: Vec<u8>, width: u32, height: u32) -> ImageId {
+        self.image_store.insert(pixels, width, height)
+    }
+
+    /// Store premultiplied RGBA8 pixel data where the physical texture differs
+    /// from the logical layout size (e.g. SVG rasterized at a scale factor).
+    pub fn load_image_scaled(
+        &mut self,
+        pixels: Vec<u8>,
+        width: u32,
+        height: u32,
+        logical_width: u32,
+        logical_height: u32,
+    ) -> ImageId {
+        self.image_store.insert_scaled(pixels, width, height, logical_width, logical_height)
     }
 
     /// Like [`frame`] but borrows the root widget instead of consuming it.
@@ -128,7 +153,12 @@ impl UiScene {
         }
 
         // ── measure ───────────────────────────────────────────────────────
-        let ctx = LayoutCtx { fonts: &self.font_system, scale: self.pixel_ratio, focus: None };
+        let ctx = LayoutCtx {
+            fonts: &self.font_system,
+            images: &self.image_store,
+            scale: self.pixel_ratio,
+            focus: None,
+        };
         let _ = root.measure(Constraints::loose(viewport), &ctx);
         let rect = Rect::new(0.0, 0.0, viewport.x, viewport.y);
 
@@ -137,6 +167,7 @@ impl UiScene {
             let mut painter = Painter::new(
                 &mut self.draw_list,
                 &self.font_system,
+                &self.image_store,
                 input.mouse_pos,
                 input.mouse_pressed,
                 self.pixel_ratio,
@@ -148,6 +179,7 @@ impl UiScene {
         {
             let ctx = LayoutCtx {
                 fonts: &self.font_system,
+                images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
             };
@@ -177,6 +209,7 @@ impl UiScene {
         {
             let ctx = LayoutCtx {
                 fonts: &self.font_system,
+                images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
             };
@@ -241,7 +274,12 @@ impl UiScene {
         }
 
         // ── measure ───────────────────────────────────────────────────────
-        let ctx = LayoutCtx { fonts: &self.font_system, scale: self.pixel_ratio, focus: None };
+        let ctx = LayoutCtx {
+            fonts: &self.font_system,
+            images: &self.image_store,
+            scale: self.pixel_ratio,
+            focus: None,
+        };
         // Pre-pass: let children compute their natural sizes. The root itself
         // always occupies the full viewport, so its measured size is unused.
         let _ = root.measure(Constraints::loose(viewport), &ctx);
@@ -252,6 +290,7 @@ impl UiScene {
             let mut painter = Painter::new(
                 &mut self.draw_list,
                 &self.font_system,
+                &self.image_store,
                 input.mouse_pos,
                 input.mouse_pressed,
                 self.pixel_ratio,
@@ -263,6 +302,7 @@ impl UiScene {
         {
             let ctx = LayoutCtx {
                 fonts: &self.font_system,
+                images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
             };
@@ -292,6 +332,7 @@ impl UiScene {
         {
             let ctx = LayoutCtx {
                 fonts: &self.font_system,
+                images: &self.image_store,
                 scale: self.pixel_ratio,
                 focus: Some(&self.focus),
             };

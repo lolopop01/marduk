@@ -1,4 +1,5 @@
 pub(crate) mod circle;
+pub(crate) mod image;
 pub(crate) mod rect;
 pub(crate) mod rounded_rect;
 pub(crate) mod text;

@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use marduk_engine::coords::{CornerRadii, Rect, Vec2};
+use marduk_engine::image::{ImageId, ImageStore};
 use marduk_engine::paint::{Color, Paint};
 use marduk_engine::scene::{Border, DrawList, ZIndex};
 use marduk_engine::text::{FontId, FontSystem};
@@ -16,6 +17,7 @@ use crate::focus::{FocusId, FocusManager};
 pub struct Painter<'a> {
     pub(crate) draw_list: &'a mut DrawList,
     pub(crate) font_system: &'a FontSystem,
+    pub(crate) image_store: &'a ImageStore,
     /// Physical-to-logical pixel ratio for this frame (os_scale × zoom).
     ///
     /// Use [`measure_text`] rather than `font_system.measure_text` so that
@@ -37,11 +39,12 @@ impl<'a> Painter<'a> {
     pub(crate) fn new(
         draw_list: &'a mut DrawList,
         font_system: &'a FontSystem,
+        image_store: &'a ImageStore,
         mouse_pos: Vec2,
         mouse_pressed: bool,
         scale: f32,
     ) -> Self {
-        Self { draw_list, font_system, scale, z: 0, mouse_pos, mouse_pressed, focus: None }
+        Self { draw_list, font_system, image_store, scale, z: 0, mouse_pos, mouse_pressed, focus: None }
     }
 
     pub(crate) fn with_focus(mut self, focus: &'a RefCell<FocusManager>) -> Self {
@@ -115,13 +118,13 @@ impl<'a> Painter<'a> {
 
     // ── layout context ────────────────────────────────────────────────────
 
-    /// Returns a [`LayoutCtx`] borrowing this painter's font system.
+    /// Returns a [`LayoutCtx`] borrowing this painter's font and image stores.
     ///
     /// Useful inside [`Widget::paint`] when a container needs to re-measure
     /// its children to compute their layout positions.
     #[inline]
     pub fn layout_ctx(&self) -> LayoutCtx<'_> {
-        LayoutCtx { fonts: self.font_system, scale: self.scale, focus: None }
+        LayoutCtx { fonts: self.font_system, images: self.image_store, scale: self.scale, focus: None }
     }
 
     // ── drawing ───────────────────────────────────────────────────────────
@@ -182,6 +185,24 @@ impl<'a> Painter<'a> {
     ) {
         let z = self.next_z();
         self.draw_list.push_text(z, text, font, size, color, origin, max_width);
+    }
+
+    /// Draw an image in `dest_rect`.
+    ///
+    /// - `uv_min` / `uv_max`: texture coordinate range (use `[0,0]`/`[1,1]` for full image).
+    /// - `tint_straight`: straight-alpha RGBA multiplier; pass `[1,1,1,1]` for no tint.
+    /// - `corner_radii`: rounds the corners with an SDF clip.
+    pub fn draw_image(
+        &mut self,
+        dest_rect: Rect,
+        id: ImageId,
+        uv_min: [f32; 2],
+        uv_max: [f32; 2],
+        tint_straight: [f32; 4],
+        corner_radii: CornerRadii,
+    ) {
+        let z = self.next_z();
+        self.draw_list.push_image(z, dest_rect, id, uv_min, uv_max, tint_straight, corner_radii);
     }
 
     // ── clipping ──────────────────────────────────────────────────────────

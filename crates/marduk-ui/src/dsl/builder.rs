@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use marduk_engine::image::ImageId;
 use marduk_engine::paint::{Color, Paint};
 use marduk_engine::scene::Border;
 use marduk_engine::text::FontId;
@@ -31,6 +32,7 @@ use crate::widgets::{
     checkbox::Checkbox,
     container::Container,
     flex::{Align, Column, Row},
+    image::{Image, ImageFit},
     progress::ProgressBar,
     radio::RadioGroup,
     scroll::ScrollView,
@@ -60,6 +62,8 @@ pub enum WidgetStateValue {
 pub struct DslBindings {
     /// Named fonts available to DSL nodes (e.g. `"body"` → `FontId`).
     pub fonts: HashMap<String, FontId>,
+    /// Named images available to DSL `Image` nodes (e.g. `"logo"` → `ImageId`).
+    pub images: HashMap<String, ImageId>,
     /// Shared event queue. Button `on_click: name` pushes `name` here.
     pub event_queue: Rc<RefCell<Vec<String>>>,
     /// Persistent state for stateful widgets (Checkbox, Toggle, Slider, RadioGroup, TextBox).
@@ -75,6 +79,7 @@ impl DslBindings {
     pub fn new() -> Self {
         Self {
             fonts:            HashMap::new(),
+            images:           HashMap::new(),
             event_queue:      Rc::new(RefCell::new(Vec::new())),
             widget_state:     Rc::new(RefCell::new(HashMap::new())),
             focused_widget:   Rc::new(RefCell::new(None)),
@@ -89,6 +94,7 @@ impl DslBindings {
     pub fn with_state(widget_state: Rc<RefCell<HashMap<String, WidgetStateValue>>>) -> Self {
         Self {
             fonts:            HashMap::new(),
+            images:           HashMap::new(),
             event_queue:      Rc::new(RefCell::new(Vec::new())),
             widget_state,
             focused_widget:   Rc::new(RefCell::new(None)),
@@ -172,6 +178,7 @@ impl DslLoader {
             "TextBox"     => self.build_textbox(node, bindings),
             "ScrollView"  => self.build_scroll_view(node, bindings),
             "Stack"       => self.build_stack(node, bindings),
+            "Image"       => self.build_image(node, bindings),
             alias => {
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
@@ -726,6 +733,38 @@ impl DslLoader {
         }
 
         stack.into()
+    }
+
+    // ── Image ─────────────────────────────────────────────────────────────
+
+    fn build_image(&self, node: &Node, bindings: &DslBindings) -> Element {
+        // Resolve `src` property to an ImageId.
+        let Some(src) = node.prop_str("src") else {
+            return Container::new().into();
+        };
+        let Some(&id) = bindings.images.get(src) else {
+            #[cfg(debug_assertions)]
+            eprintln!("marduk-ui: Image src '{src}' not found in bindings");
+            return Container::new().into();
+        };
+
+        let fit = match node.prop_str("fit").unwrap_or("contain") {
+            "fill"    => ImageFit::Fill,
+            "cover"   => ImageFit::Cover,
+            "none"    => ImageFit::None,
+            _         => ImageFit::Contain,
+        };
+
+        let mut img = Image::new(id).fit(fit);
+
+        if let Some(r) = node.prop_f32("radius").or_else(|| node.prop_f32("corner_radius")) {
+            img = img.corner_radius(r);
+        }
+        if let Some(col) = node.engine_color("tint") {
+            img = img.tint(col);
+        }
+
+        img.into()
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

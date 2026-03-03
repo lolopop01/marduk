@@ -18,6 +18,8 @@ fn main() {
         .zoom(1.0)               // Ctrl+Scroll to adjust at runtime
         .window_mode(WindowMode::Fullscreen)
         .font("body", load_font())
+        // ── test images ───────────────────────────────────────────────────
+        .image("truck_icon", truck_icon_svg())
         // ── components ────────────────────────────────────────────────────
         .component("Header",   include_str!("../ui/header.mkml"))
         .component("Fleet",    include_str!("../ui/components/fleet.mkml"))
@@ -57,4 +59,17 @@ fn load_font() -> Vec<u8> {
     .iter()
     .find_map(|p| std::fs::read(p).ok())
     .unwrap_or_default()
+}
+
+/// A simple SVG truck icon for testing image rendering.
+fn truck_icon_svg() -> Vec<u8> {
+    br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+      <rect x="2" y="22" width="40" height="26" rx="3" fill="#c8a84b"/>
+      <path d="M42 28h10l8 12v8h-18V28z" fill="#a08030"/>
+      <circle cx="14" cy="52" r="7" fill="#1a1a1a"/>
+      <circle cx="14" cy="52" r="3" fill="#555"/>
+      <circle cx="50" cy="52" r="7" fill="#1a1a1a"/>
+      <circle cx="50" cy="52" r="3" fill="#555"/>
+      <rect x="6" y="28" width="18" height="12" rx="2" fill="#7ec8e3" opacity="0.8"/>
+    </svg>"##.to_vec()
 }

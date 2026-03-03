@@ -7,8 +7,10 @@ use winit::window::Fullscreen;
 
 use marduk_engine::core::{App as EngineApp, AppControl, FrameCtx};
 use marduk_engine::device::GpuInit;
+use marduk_engine::image::ImageId;
 use marduk_engine::input::{Key, MouseButton};
 use marduk_engine::render::shapes::circle::CircleRenderer;
+use marduk_engine::render::shapes::image::ImageRenderer;
 use marduk_engine::render::shapes::rect::RectRenderer;
 use marduk_engine::render::shapes::rounded_rect::RoundedRectRenderer;
 use marduk_engine::render::shapes::text::TextRenderer;
@@ -19,6 +21,7 @@ use marduk_engine::coords::Vec2;
 
 use crate::dsl::{DslBindings, DslDocument, DslLoader};
 use crate::dsl::builder::WidgetStateValue;
+use crate::image_loader::{decode_image, decode_svg, is_svg};
 use crate::scene::{UiInput, UiScene};
 use crate::widget::Element;
 
@@ -55,25 +58,35 @@ impl WidgetState {
 
 // ── FontMap ───────────────────────────────────────────────────────────────
 
-/// A name-keyed map of loaded font handles.
+/// A name-keyed map of loaded font and image handles.
 ///
 /// Passed to the builder closure in [`Application::run_widget`] so the
-/// application can retrieve [`FontId`] values by name without ever importing
-/// engine internals.
+/// application can retrieve [`FontId`] / [`ImageId`] values by name without
+/// ever importing engine internals.
 ///
 /// ```rust,ignore
 /// .run_widget(|fonts: &FontMap| {
-///     let body = fonts.get("body");
-///     MyApp::new(body).into()
+///     let body  = fonts.get("body");
+///     let logo  = fonts.image("logo").unwrap();
+///     MyApp::new(body, logo).into()
 /// })
 /// ```
-pub struct FontMap(pub(crate) HashMap<String, FontId>);
+pub struct FontMap {
+    pub(crate) fonts: HashMap<String, FontId>,
+    pub(crate) images: HashMap<String, ImageId>,
+}
 
 impl FontMap {
     /// Returns the [`FontId`] registered under `name`, or `None` if the name
     /// was not registered or the font failed to load.
     pub fn get(&self, name: &str) -> Option<FontId> {
-        self.0.get(name).copied()
+        self.fonts.get(name).copied()
+    }
+
+    /// Returns the [`ImageId`] registered under `name`, or `None` if the name
+    /// was not registered or the image failed to decode.
+    pub fn image(&self, name: &str) -> Option<ImageId> {
+        self.images.get(name).copied()
     }
 }
 
@@ -111,6 +124,8 @@ pub struct Application {
     zoom:           f32,
     window_mode:    WindowMode,
     fonts:          Vec<(String, Vec<u8>)>,
+    /// Images: `(name, bytes, svg_scale)`. `svg_scale` is 1.0 for raster formats.
+    images:         Vec<(String, Vec<u8>, f32)>,
     components:     Vec<(String, String)>,
     event_handlers: HashMap<String, Box<dyn FnMut()>>,
     /// Shared widget state — created early so `on_event_state` closures can capture it.
@@ -126,6 +141,7 @@ impl Application {
             zoom:           1.0,
             window_mode:    WindowMode::Windowed,
             fonts:          Vec::new(),
+            images:         Vec::new(),
             components:     Vec::new(),
             event_handlers: HashMap::new(),
             widget_state:   Rc::new(RefCell::new(HashMap::new())),
@@ -171,6 +187,26 @@ impl Application {
     /// successfully becomes the default.
     pub fn font(mut self, name: impl Into<String>, data: Vec<u8>) -> Self {
         self.fonts.push((name.into(), data));
+        self
+    }
+
+    /// Register an image (PNG, JPEG, BMP, GIF, WebP, ICO, TIFF, or SVG) under `name`.
+    ///
+    /// The image is decoded once at startup. Raster formats are premultiplied;
+    /// SVG is rasterized at its natural size. Use [`svg`] for explicit scale control.
+    ///
+    /// In `.mkml` files reference the image with `src: "name"`.
+    /// In [`run_widget`] closures retrieve the [`ImageId`] via [`FontMap::image`].
+    pub fn image(mut self, name: impl Into<String>, bytes: Vec<u8>) -> Self {
+        self.images.push((name.into(), bytes, 1.0));
+        self
+    }
+
+    /// Register an SVG image under `name`, rasterized at `scale × natural size`.
+    ///
+    /// Use `scale = 2.0` for HiDPI icons.
+    pub fn svg(mut self, name: impl Into<String>, bytes: Vec<u8>, scale: f32) -> Self {
+        self.images.push((name.into(), bytes, scale));
         self
     }
 
@@ -285,6 +321,7 @@ struct UiAppState {
     rounded_rect_renderer: RoundedRectRenderer,
     circle_renderer:       CircleRenderer,
     text_renderer:         TextRenderer,
+    image_renderer:        ImageRenderer,
 
     // DSL mode
     loader:   DslLoader,
@@ -299,11 +336,17 @@ struct UiAppState {
 
     // Drag tracking — position where the current mouse drag started (None when not dragging).
     drag_origin: Option<Vec2>,
+
+    // SVG re-rasterization: raw bytes stored so we can re-decode at new scale.
+    /// `(id, raw_svg_bytes)` for every SVG registered via `.image()` / `.svg()`.
+    svg_sources: Vec<(ImageId, Vec<u8>)>,
+    /// The `raster_scale` at which SVGs were last rasterized.
+    last_raster_scale: f32,
 }
 
 impl UiAppState {
     fn new_dsl(app: Application, doc: DslDocument) -> Self {
-        let (ui_scene, loader, bindings) = Self::setup_dsl(&app);
+        let (ui_scene, loader, bindings, svg_sources) = Self::setup_dsl(&app);
         Self {
             title:                 app.title,
             width:                 app.width,
@@ -315,12 +358,15 @@ impl UiAppState {
             rounded_rect_renderer: RoundedRectRenderer::new(),
             circle_renderer:       CircleRenderer::new(),
             text_renderer:         TextRenderer::new(),
+            image_renderer:        ImageRenderer::new(),
             loader,
             doc:                   Some(doc),
             bindings,
             root:                  None,
             event_handlers:        app.event_handlers,
             drag_origin:           None,
+            svg_sources,
+            last_raster_scale:     0.0, // force re-rasterize on first frame
         }
     }
 
@@ -328,8 +374,11 @@ impl UiAppState {
     where
         F: FnOnce(&FontMap) -> Element,
     {
-        let (ui_scene, loader, bindings) = Self::setup_dsl(&app);
-        let font_map = FontMap(bindings.fonts.clone());
+        let (ui_scene, loader, bindings, svg_sources) = Self::setup_dsl(&app);
+        let font_map = FontMap {
+            fonts: bindings.fonts.clone(),
+            images: bindings.images.clone(),
+        };
         let root = build(&font_map);
         Self {
             title:                 app.title,
@@ -342,26 +391,53 @@ impl UiAppState {
             rounded_rect_renderer: RoundedRectRenderer::new(),
             circle_renderer:       CircleRenderer::new(),
             text_renderer:         TextRenderer::new(),
+            image_renderer:        ImageRenderer::new(),
             loader,
             doc:                   None,
             bindings,
             root:                  Some(root),
             event_handlers:        app.event_handlers,
             drag_origin:           None,
+            svg_sources,
+            last_raster_scale:     0.0,
         }
     }
 
-    /// Load fonts into a new `UiScene`, set up DSL loader, return both.
-    fn setup_dsl(app: &Application) -> (UiScene, DslLoader, DslBindings) {
+    /// Load fonts + images into a new `UiScene`, set up DSL loader, return all.
+    ///
+    /// SVG images are decoded at scale 1.0 initially; `UiAppState::on_frame`
+    /// re-rasterizes them at the actual `raster_scale` on the first frame and
+    /// whenever the scale changes thereafter.
+    fn setup_dsl(
+        app: &Application,
+    ) -> (UiScene, DslLoader, DslBindings, Vec<(ImageId, Vec<u8>)>) {
         let mut ui_scene = UiScene::new();
         // Re-use the widget_state Rc that event handlers may already have captured.
         let mut bindings = DslBindings::with_state(app.widget_state.clone());
+        let mut svg_sources: Vec<(ImageId, Vec<u8>)> = Vec::new();
 
         for (name, bytes) in &app.fonts {
             if let Ok(id) = ui_scene.load_font(bytes) {
                 bindings.fonts.insert(name.clone(), id);
             } else {
                 log::warn!("failed to load font '{name}'");
+            }
+        }
+
+        for (name, bytes, scale) in &app.images {
+            match decode_image(bytes, *scale) {
+                Ok(img) => {
+                    let id = ui_scene.load_image_scaled(
+                        img.pixels, img.width, img.height,
+                        img.logical_width, img.logical_height,
+                    );
+                    bindings.images.insert(name.clone(), id);
+                    // Retain SVG source bytes so we can re-rasterize on scale change.
+                    if is_svg(bytes) {
+                        svg_sources.push((id, bytes.clone()));
+                    }
+                }
+                Err(e) => log::warn!("failed to load image '{name}': {e}"),
             }
         }
 
@@ -372,7 +448,19 @@ impl UiAppState {
             }
         }
 
-        (ui_scene, loader, bindings)
+        (ui_scene, loader, bindings, svg_sources)
+    }
+
+    /// Re-rasterize all SVG images at `scale` and update the image store.
+    fn rerasterize_svgs(&mut self, scale: f32) {
+        for (id, bytes) in &self.svg_sources {
+            match decode_svg(bytes, scale) {
+                Ok(img) => {
+                    self.ui_scene.image_store.update(*id, img.pixels, img.width, img.height);
+                }
+                Err(e) => log::warn!("SVG re-rasterization failed: {e}"),
+            }
+        }
     }
 }
 
@@ -437,6 +525,12 @@ impl EngineApp for UiAppState {
         let raster_scale = (os_scale * self.zoom * 4.0).round() / 4.0;
         self.ui_scene.pixel_ratio = raster_scale;
 
+        // ── Re-rasterize SVGs at current physical scale if it changed ─────
+        if raster_scale != self.last_raster_scale && !self.svg_sources.is_empty() {
+            self.rerasterize_svgs(raster_scale);
+            self.last_raster_scale = raster_scale;
+        }
+
         // ── Layout + paint ────────────────────────────────────────────────
         match (&self.doc, &mut self.root) {
             (Some(doc), _) => {
@@ -459,16 +553,19 @@ impl EngineApp for UiAppState {
         // ── Render ────────────────────────────────────────────────────────
         let dl    = &mut self.ui_scene.draw_list;
         let fs    = &self.ui_scene.font_system;
+        let imgs  = &self.ui_scene.image_store;
         let r_r   = &mut self.rect_renderer;
         let r_rr  = &mut self.rounded_rect_renderer;
         let r_c   = &mut self.circle_renderer;
         let r_t   = &mut self.text_renderer;
+        let r_img = &mut self.image_renderer;
         let zoom  = self.zoom;
 
         ctx.render_scaled(zoom, marduk_engine::paint::Color::from_straight(0.054, 0.051, 0.043, 1.0), |rctx, target| {
             r_r.render(rctx, target, dl);
             r_rr.render(rctx, target, dl);
             r_c.render(rctx, target, dl);
+            r_img.render(rctx, target, dl, imgs);
             r_t.render(rctx, target, dl, fs);
         })
     }

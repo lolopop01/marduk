@@ -2,6 +2,7 @@ pub mod button;
 pub mod checkbox;
 pub mod container;
 pub mod flex;
+pub mod image;
 pub mod progress;
 pub mod radio;
 pub mod scroll;

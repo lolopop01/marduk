@@ -175,12 +175,13 @@ impl Widget for Column {
     }
 
     fn paint(&self, painter: &mut Painter, rect: Rect) {
-        // Copy the font_system reference and scale out of painter first.
-        // `&FontSystem` is Copy so this ends the borrow on `painter`,
+        // Copy the font_system and image_store references out of painter first.
+        // Both are Copy references, which ends the borrow on `painter`,
         // letting us pass `painter` mutably to child.paint() in the loop.
-        let fonts = painter.font_system;
-        let scale = painter.scale;
-        let ctx = LayoutCtx { fonts, scale, focus: None };
+        let fonts  = painter.font_system;
+        let images = painter.image_store;
+        let scale  = painter.scale;
+        let ctx = LayoutCtx { fonts, images, scale, focus: None };
 
         let inner = inset_rect(rect, self.padding);
         let child_c = self.child_constraints(inner.size.x);
@@ -405,9 +406,10 @@ impl Widget for Row {
     }
 
     fn paint(&self, painter: &mut Painter, rect: Rect) {
-        let fonts = painter.font_system;
-        let scale = painter.scale;
-        let ctx = LayoutCtx { fonts, scale, focus: None };
+        let fonts  = painter.font_system;
+        let images = painter.image_store;
+        let scale  = painter.scale;
+        let ctx = LayoutCtx { fonts, images, scale, focus: None };
 
         let inner   = inset_rect(rect, self.padding);
         let child_c = self.child_constraints(inner.size.y);

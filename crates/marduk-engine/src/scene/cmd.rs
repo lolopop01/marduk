@@ -1,4 +1,5 @@
 use crate::scene::shapes::circle::CircleCmd;
+use crate::scene::shapes::image::ImageCmd;
 use crate::scene::shapes::rect::RectCmd;
 use crate::scene::shapes::rounded_rect::RoundedRectCmd;
 use crate::scene::shapes::text::TextCmd;
@@ -16,4 +17,5 @@ pub enum DrawCmd {
     RoundedRect(RoundedRectCmd),
     Circle(CircleCmd),
     Text(TextCmd),
+    Image(ImageCmd),
 }

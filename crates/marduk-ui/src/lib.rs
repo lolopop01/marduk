@@ -43,6 +43,7 @@
 pub mod app;
 pub mod constraints;
 pub mod focus;
+pub(crate) mod image_loader;
 
 // Top-level re-exports for the common entry point — `use marduk_ui::Application`
 pub use app::Application;
@@ -67,6 +68,7 @@ pub mod prelude {
         checkbox::Checkbox,
         container::Container,
         flex::{Align, Column, Row},
+        image::{Image, ImageFit},
         progress::ProgressBar,
         radio::{RadioGroup, RadioOption},
         scroll::ScrollView,
@@ -80,6 +82,7 @@ pub mod prelude {
 
     // Re-export the engine primitives everyone needs.
     pub use marduk_engine::coords::{CornerRadii, Rect, Vec2};
+    pub use marduk_engine::image::ImageId;
     pub use marduk_engine::paint::{Color, ColorStop, LinearGradient, Paint, SpreadMode};
     pub use marduk_engine::scene::Border;
     pub use marduk_engine::text::FontId;
