@@ -838,19 +838,27 @@ impl DslLoader {
     // ── Splitter ──────────────────────────────────────────────────────────
 
     fn build_splitter(&self, node: &Node, bindings: &DslBindings) -> Element {
-        let state_key = node.prop_str("id")
+        let state_key: Option<String> = node.prop_str("id")
             .or_else(|| node.prop_str("state_key"))
             .or_else(|| node.prop_str("on_change"))
             .map(|s| s.to_string());
 
         let default_ratio = node.prop_f32("ratio").unwrap_or(0.5);
-        let ratio = if let Some(key) = &state_key {
-            match bindings.widget_state.borrow().get(key.as_str()) {
+        let drag_key = state_key.as_ref().map(|k| format!("{k}_dragging"));
+
+        let (ratio, dragging) = if let Some(key) = &state_key {
+            let ws = bindings.widget_state.borrow();
+            let r = match ws.get(key.as_str()) {
                 Some(WidgetStateValue::Float(v)) => *v,
                 _ => default_ratio,
-            }
+            };
+            let d = drag_key.as_ref().and_then(|dk| match ws.get(dk.as_str()) {
+                Some(WidgetStateValue::Bool(b)) => Some(*b),
+                _ => None,
+            }).unwrap_or(false);
+            (r, d)
         } else {
-            default_ratio
+            (default_ratio, false)
         };
 
         let mut children = node.children.iter();
@@ -870,20 +878,26 @@ impl DslLoader {
             SplitDirection::Horizontal => Splitter::horizontal(first, second),
             SplitDirection::Vertical   => Splitter::vertical(first, second),
         }
-        .initial_ratio(ratio);
+        .initial_ratio(ratio)
+        .initial_dragging(dragging);
 
         if let Some(v) = node.prop_f32("min_first")   { sp = sp.min_first(v); }
         if let Some(v) = node.prop_f32("min_second")  { sp = sp.min_second(v); }
         if let Some(v) = node.prop_f32("handle_size") { sp = sp.handle_size(v); }
 
         if let Some(event_name) = node.prop_str("on_change") {
-            let queue = Rc::clone(&bindings.event_queue);
-            let state = Rc::clone(&bindings.widget_state);
-            let key   = state_key.unwrap_or_else(|| event_name.to_string());
-            let name  = event_name.to_string();
+            let queue  = Rc::clone(&bindings.event_queue);
+            let state  = Rc::clone(&bindings.widget_state);
+            let state2 = Rc::clone(&bindings.widget_state);
+            let key    = state_key.unwrap_or_else(|| event_name.to_string());
+            let dkey   = drag_key.unwrap_or_default();
+            let name   = event_name.to_string();
             sp = sp.on_change(move |v| {
                 state.borrow_mut().insert(key.clone(), WidgetStateValue::Float(v));
                 queue.borrow_mut().push(name.clone());
+            });
+            sp = sp.on_drag_change(move |d| {
+                state2.borrow_mut().insert(dkey.clone(), WidgetStateValue::Bool(d));
             });
         }
 

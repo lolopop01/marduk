@@ -37,6 +37,13 @@ pub struct Splitter {
     min_second: f32,
     handle_size: f32,
     on_change: Option<Box<dyn FnMut(f32)>>,
+    /// True while a drag that started on the handle is in progress.
+    /// In pure-Rust usage this persists on the struct; for DSL usage it must
+    /// be restored each frame from widget_state via `initial_dragging`.
+    dragging: bool,
+    /// Called when the drag-lock changes (true = drag started, false = ended).
+    /// The DSL builder uses this to persist `dragging` across frame rebuilds.
+    on_drag_change: Option<Box<dyn FnMut(bool)>>,
 }
 
 impl Splitter {
@@ -62,11 +69,19 @@ impl Splitter {
             min_second: 0.0,
             handle_size: 4.0,
             on_change: None,
+            dragging: false,
+            on_drag_change: None,
         }
     }
 
     pub fn initial_ratio(mut self, r: f32) -> Self {
         self.ratio = r.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Restore the drag-lock state (used by the DSL builder each frame).
+    pub fn initial_dragging(mut self, dragging: bool) -> Self {
+        self.dragging = dragging;
         self
     }
 
@@ -87,6 +102,12 @@ impl Splitter {
 
     pub fn on_change(mut self, f: impl FnMut(f32) + 'static) -> Self {
         self.on_change = Some(Box::new(f));
+        self
+    }
+
+    /// Called with `true` when a handle drag begins, `false` when it ends.
+    pub fn on_drag_change(mut self, f: impl FnMut(bool) + 'static) -> Self {
+        self.on_drag_change = Some(Box::new(f));
         self
     }
 
@@ -113,6 +134,29 @@ impl Splitter {
                 let second_rect = Rect::new(rect.origin.x, rect.origin.y + first_h + hs, rect.size.x, second_h);
                 (first_rect, handle_rect, second_rect)
             }
+        }
+    }
+
+    /// Returns a wider rect for drag/hover detection around the visual handle.
+    ///
+    /// The visual bar stays at `handle_size` pixels, but the interactive region
+    /// extends by `GRAB_EXTRA` pixels on each perpendicular side so the divider
+    /// is easy to grab without pixel-precise aiming.
+    fn grab_rect(&self, handle_rect: Rect) -> Rect {
+        const GRAB_EXTRA: f32 = 6.0;
+        match self.direction {
+            SplitDirection::Horizontal => Rect::new(
+                handle_rect.origin.x - GRAB_EXTRA,
+                handle_rect.origin.y,
+                handle_rect.size.x + GRAB_EXTRA * 2.0,
+                handle_rect.size.y,
+            ),
+            SplitDirection::Vertical => Rect::new(
+                handle_rect.origin.x,
+                handle_rect.origin.y - GRAB_EXTRA,
+                handle_rect.size.x,
+                handle_rect.size.y + GRAB_EXTRA * 2.0,
+            ),
         }
     }
 
@@ -144,43 +188,48 @@ impl Widget for Splitter {
     fn paint(&self, painter: &mut Painter, rect: Rect) {
         let (first_rect, handle_rect, second_rect) = self.compute_rects(rect);
 
-        let fonts  = painter.font_system;
-        let images = painter.image_store;
-        let scale  = painter.scale;
-        let ctx = LayoutCtx { fonts, images, scale, focus: None, time_ms: 0 };
-
         self.first.paint(painter, first_rect);
         self.second.paint(painter, second_rect);
 
         // Draw the handle on top of the children.
-        let handle_color = if painter.is_hovered(handle_rect) {
+        // Hover detection uses the wider grab_rect so the highlight activates
+        // before the cursor is precisely over the 4 px bar.
+        let grab = self.grab_rect(handle_rect);
+        let handle_color = if self.dragging || painter.is_hovered(grab) {
             Color::from_srgb(0.45, 0.45, 0.50, 1.0)
         } else {
             Color::from_srgb(0.25, 0.25, 0.28, 1.0)
         };
-        let _ = ctx; // ctx only needed for measure in some variants
         painter.fill_rect(handle_rect, handle_color);
     }
 
     fn on_event(&mut self, event: &UiEvent, rect: Rect, ctx: &LayoutCtx<'_>) -> EventResult {
         let (first_rect, handle_rect, second_rect) = self.compute_rects(rect);
 
+        // The grab rect is computed from the CURRENT handle position. Once a
+        // drag starts we latch `dragging = true` so we keep owning it even as
+        // the handle moves away from the original click point. In DSL mode
+        // `dragging` is restored each frame via `initial_dragging` + the
+        // `on_drag_change` callback which persists it through widget_state.
+        let grab = self.grab_rect(handle_rect);
         match event {
             UiEvent::Drag { pos, start } => {
-                if handle_rect.contains(*start) {
-                    self.ratio = self.ratio_from_drag(rect, *pos).clamp(0.01, 0.99);
-                    if let Some(f) = &mut self.on_change {
-                        f(self.ratio);
+                if self.dragging || grab.contains(*start) {
+                    if !self.dragging {
+                        self.dragging = true;
+                        if let Some(f) = &mut self.on_drag_change { f(true); }
                     }
+                    self.ratio = self.ratio_from_drag(rect, *pos).clamp(0.01, 0.99);
+                    if let Some(f) = &mut self.on_change { f(self.ratio); }
                     return EventResult::Consumed;
                 }
             }
             UiEvent::DragEnd { pos, start } => {
-                if handle_rect.contains(*start) {
+                if self.dragging || grab.contains(*start) {
+                    self.dragging = false;
+                    if let Some(f) = &mut self.on_drag_change { f(false); }
                     self.ratio = self.ratio_from_drag(rect, *pos).clamp(0.01, 0.99);
-                    if let Some(f) = &mut self.on_change {
-                        f(self.ratio);
-                    }
+                    if let Some(f) = &mut self.on_change { f(self.ratio); }
                     return EventResult::Consumed;
                 }
             }
