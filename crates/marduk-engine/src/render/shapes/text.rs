@@ -67,8 +67,6 @@ pub struct TextRenderer {
     // geometry
     quad_vbo: Option<wgpu::Buffer>,
     quad_ibo: Option<wgpu::Buffer>,
-    instance_vbo: Option<wgpu::Buffer>,
-    instance_capacity: usize,
 
     // reusable fontdue layout
     layout: Layout<()>,
@@ -95,8 +93,6 @@ impl Default for TextRenderer {
             current_raster_scale: 0.0, // 0.0 forces an update on the first frame
             quad_vbo: None,
             quad_ibo: None,
-            instance_vbo: None,
-            instance_capacity: 0,
             layout: Layout::new(CoordinateSystem::PositiveYDown),
         }
     }
@@ -226,11 +222,13 @@ impl TextRenderer {
         // ── mutable operations before any immutable borrows ────────────────
         self.ensure_bindings(ctx);
         self.write_viewport_uniform(ctx);
-        self.ensure_instance_capacity(ctx, instances.len());
 
-        let Some(instance_vbo) = self.instance_vbo.as_ref() else { return; };
         let raw: Vec<GlyphInstance> = instances.iter().map(|(inst, _)| *inst).collect();
-        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&raw));
+        let instance_vbo = ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("marduk text instance vbo"),
+            contents: bytemuck::cast_slice(&raw),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         // ── immutable borrows ──────────────────────────────────────────────
         let Some(pipeline)   = self.pipeline.as_ref()   else { return; };
@@ -554,20 +552,6 @@ impl TextRenderer {
         );
     }
 
-    fn ensure_instance_capacity(&mut self, ctx: &RenderCtx<'_>, required: usize) {
-        if required <= self.instance_capacity && self.instance_vbo.is_some() {
-            return;
-        }
-        let new_cap  = required.next_power_of_two().max(64);
-        let new_size = (new_cap * std::mem::size_of::<GlyphInstance>()) as u64;
-        self.instance_vbo = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("marduk text instance vbo"),
-            size: new_size,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        }));
-        self.instance_capacity = new_cap;
-    }
 }
 
 // ── GPU types ─────────────────────────────────────────────────────────────

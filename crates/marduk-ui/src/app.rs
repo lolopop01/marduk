@@ -568,11 +568,25 @@ impl EngineApp for UiAppState {
         let zoom  = self.zoom;
 
         ctx.render_scaled(zoom, marduk_engine::paint::Color::from_straight(0.054, 0.051, 0.043, 1.0), |rctx, target| {
+            // Pass 1 — normal content (z < 100 000): shapes then text.
+            dl.set_z_range(i32::MIN, 99_999);
             r_r.render(rctx, target, dl);
             r_rr.render(rctx, target, dl);
             r_c.render(rctx, target, dl);
             r_img.render(rctx, target, dl, imgs);
             r_t.render(rctx, target, dl, fs);
+
+            // Pass 2 — overlay content (z ≥ 100 000): shapes then text.
+            // Ensures overlay widgets (combobox dropdown, tooltip, modal) always
+            // appear above all normal content regardless of draw-command type.
+            dl.set_z_range(100_000, i32::MAX);
+            r_r.render(rctx, target, dl);
+            r_rr.render(rctx, target, dl);
+            r_c.render(rctx, target, dl);
+            r_img.render(rctx, target, dl, imgs);
+            r_t.render(rctx, target, dl, fs);
+
+            dl.reset_z_range();
         })
     }
 }

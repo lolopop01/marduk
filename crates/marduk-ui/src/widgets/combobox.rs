@@ -247,7 +247,11 @@ impl Widget for Combobox {
                     } else {
                         item_bg
                     };
-                    p.fill_rect(item, row_bg);
+                    // Use rounded_rect (radius=0) so this lands in RoundedRectRenderer
+                    // alongside the dropdown background.  Both are then sorted by z within
+                    // the same renderer, ensuring the hover highlight renders on top of the
+                    // dropdown background rather than being covered by it.
+                    p.fill_rounded_rect(item, 0.0, Paint::Solid(row_bg), None);
 
                     if let Some(f) = font {
                         let pad = 8.0;

@@ -48,9 +48,6 @@ pub struct ImageRenderer {
     quad_vbo: Option<wgpu::Buffer>,
     quad_ibo: Option<wgpu::Buffer>,
 
-    instance_vbo: Option<wgpu::Buffer>,
-    instance_capacity: usize,
-
     gpu_images: HashMap<ImageId, GpuImage>,
 }
 
@@ -105,17 +102,18 @@ impl ImageRenderer {
         }
 
         self.write_viewport_uniform(ctx);
-        self.ensure_instance_capacity(ctx, instances.len());
+
+        let raw: Vec<ImageInstance> = instances.iter().map(|(inst, _, _)| *inst).collect();
+        let instance_vbo = ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("marduk image instance vbo"),
+            contents: bytemuck::cast_slice(&raw),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         let Some(pipeline) = self.pipeline.as_ref() else { return };
         let Some(bg_viewport) = self.bg_viewport.as_ref() else { return };
         let Some(quad_vbo) = self.quad_vbo.as_ref() else { return };
         let Some(quad_ibo) = self.quad_ibo.as_ref() else { return };
-        let Some(instance_vbo) = self.instance_vbo.as_ref() else { return };
-
-        // Upload all instances.
-        let raw: Vec<ImageInstance> = instances.iter().map(|(inst, _, _)| *inst).collect();
-        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&raw));
 
         let mut rpass = target.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("marduk image pass"),
@@ -331,21 +329,6 @@ impl ImageRenderer {
                 _pad: [0.0; 2],
             }),
         );
-    }
-
-    fn ensure_instance_capacity(&mut self, ctx: &RenderCtx<'_>, required: usize) {
-        if required <= self.instance_capacity && self.instance_vbo.is_some() {
-            return;
-        }
-        let new_cap = required.next_power_of_two().max(16);
-        let new_size = (new_cap * std::mem::size_of::<ImageInstance>()) as u64;
-        self.instance_vbo = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("marduk image instance vbo"),
-            size: new_size,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        }));
-        self.instance_capacity = new_cap;
     }
 
     fn ensure_gpu_image(&mut self, ctx: &RenderCtx<'_>, id: ImageId, store: &ImageStore) {

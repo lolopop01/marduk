@@ -158,13 +158,16 @@ impl<'a> Painter<'a> {
     /// Execute `f` with the Z-index boosted to the overlay layer.
     ///
     /// All draw calls inside `f` will appear above all regular widget content.
-    /// The Z-index is restored after `f` returns so subsequent non-overlay
-    /// draws remain at normal depth.
+    /// The clip stack is also cleared so overlay content (e.g. combobox dropdowns)
+    /// can render outside their parent container's scissor region.
+    /// Both the Z-index and the clip stack are restored after `f` returns.
     pub fn overlay_scope(&mut self, f: impl FnOnce(&mut Painter)) {
         let old_z = self.z;
+        let saved_clips = self.draw_list.take_clips();
         self.z = 100_000;
         f(self);
         self.z = old_z;
+        self.draw_list.restore_clips(saved_clips);
     }
 
     // ── layout context ────────────────────────────────────────────────────

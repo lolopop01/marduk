@@ -28,9 +28,6 @@ pub struct CircleRenderer {
     quad_vbo: Option<wgpu::Buffer>,
     quad_ibo: Option<wgpu::Buffer>,
 
-    instance_vbo: Option<wgpu::Buffer>,
-    instance_capacity: usize,
-
     warned_multi_stop: bool,
 }
 
@@ -85,11 +82,13 @@ impl CircleRenderer {
         }
 
         self.write_viewport_uniform(ctx);
-        self.ensure_instance_capacity(ctx, instances.len());
 
-        let Some(instance_vbo) = self.instance_vbo.as_ref() else { return };
         let raw: Vec<CircleInstance> = instances.iter().map(|(inst, _)| *inst).collect();
-        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&raw));
+        let instance_vbo = ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("marduk circle instance vbo"),
+            contents: bytemuck::cast_slice(&raw),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         let Some(pipeline) = self.pipeline.as_ref() else { return };
         let Some(bind_group) = self.bind_group.as_ref() else { return };
@@ -266,20 +265,6 @@ impl CircleRenderer {
         );
     }
 
-    fn ensure_instance_capacity(&mut self, ctx: &RenderCtx<'_>, required: usize) {
-        if required <= self.instance_capacity && self.instance_vbo.is_some() {
-            return;
-        }
-        let new_cap = required.next_power_of_two().max(64);
-        let new_size = (new_cap * std::mem::size_of::<CircleInstance>()) as u64;
-        self.instance_vbo = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("marduk circle instance vbo"),
-            size: new_size,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        }));
-        self.instance_capacity = new_cap;
-    }
 }
 
 // ── GPU types ─────────────────────────────────────────────────────────────

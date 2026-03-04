@@ -38,6 +38,13 @@ pub struct DrawList {
     /// Stack of active scissor rects (logical pixels).
     /// The top is always the current effective clip, already intersected with all parents.
     clip_stack: Vec<Rect>,
+
+    /// Optional z-range filter applied by [`iter_in_paint_order`].
+    ///
+    /// When `Some((min, max))`, only items with `z ∈ [min, max]` are yielded.
+    /// Set via [`set_z_range`] / [`reset_z_range`] from the render loop to implement
+    /// two-pass rendering (normal content first, overlay content second).
+    z_filter: Option<(i32, i32)>,
 }
 
 impl DrawList {
@@ -104,6 +111,21 @@ impl DrawList {
         self.clip_stack.pop();
     }
 
+    /// Remove and return the entire clip stack.
+    ///
+    /// Use this together with [`restore_clips`] to temporarily escape all parent
+    /// scissor regions (e.g. for overlay / popup draws that must not be clipped).
+    #[inline]
+    pub fn take_clips(&mut self) -> Vec<Rect> {
+        std::mem::take(&mut self.clip_stack)
+    }
+
+    /// Restore a clip stack previously saved with [`take_clips`].
+    #[inline]
+    pub fn restore_clips(&mut self, clips: Vec<Rect>) {
+        self.clip_stack = clips;
+    }
+
     /// Returns indices into `items` in paint order (back-to-front).
     ///
     /// This buffer is owned by `DrawList` and reused across frames.
@@ -114,13 +136,42 @@ impl DrawList {
         &self.sorted_indices
     }
 
+    /// Restrict [`iter_in_paint_order`] to items with z ∈ `[min_z, max_z]` (inclusive).
+    ///
+    /// Call this before invoking renderers to implement two-pass overlay rendering.
+    /// Reset with [`reset_z_range`] after the pass is complete.
+    #[inline]
+    pub fn set_z_range(&mut self, min_z: i32, max_z: i32) {
+        self.z_filter = Some((min_z, max_z));
+    }
+
+    /// Remove any z-range restriction set by [`set_z_range`].
+    #[inline]
+    pub fn reset_z_range(&mut self) {
+        self.z_filter = None;
+    }
+
     /// Iterates items in paint order without cloning draw commands.
+    ///
+    /// If a z-range filter is active (set via [`set_z_range`]), only items in
+    /// that range are yielded.
     pub fn iter_in_paint_order(&mut self) -> impl Iterator<Item = &DrawItem> {
         if self.sorted_dirty {
             self.rebuild_sorted_indices();
         }
 
-        self.sorted_indices.iter().map(|&i| &self.items[i])
+        let z_filter = self.z_filter;
+        // Split the borrow explicitly so the closure doesn't capture `self`.
+        let items = &self.items;
+        self.sorted_indices.iter().filter_map(move |&i| {
+            let item = &items[i];
+            if let Some((min_z, max_z)) = z_filter {
+                if item.key.z.0 < min_z || item.key.z.0 > max_z {
+                    return None;
+                }
+            }
+            Some(item)
+        })
     }
 
     fn rebuild_sorted_indices(&mut self) {

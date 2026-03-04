@@ -26,9 +26,6 @@ pub struct RectRenderer {
     quad_vbo: Option<wgpu::Buffer>,
     quad_ibo: Option<wgpu::Buffer>,
 
-    instance_vbo: Option<wgpu::Buffer>,
-    instance_capacity: usize,
-
     warned_non_solid: bool,
 }
 
@@ -87,17 +84,17 @@ impl RectRenderer {
             return;
         }
 
-        // Mutating methods must happen before borrowing pipeline/buffers immutably.
         self.write_viewport_uniform(ctx);
-        self.ensure_instance_capacity(ctx, instances.len());
 
-        let Some(instance_vbo) = self.instance_vbo.as_ref() else { return };
-
-        // Upload raw instance data (strip clip rects).
+        // Create a fresh per-call buffer so that two-pass rendering doesn't corrupt
+        // the first pass's data when write_buffer is deferred to queue submit.
         let raw: Vec<RectInstance> = instances.iter().map(|(inst, _)| *inst).collect();
-        ctx.queue.write_buffer(instance_vbo, 0, bytemuck::cast_slice(&raw));
+        let instance_vbo = ctx.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("marduk rect instance vbo"),
+            contents: bytemuck::cast_slice(&raw),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
-        // Now take immutable borrows.
         let Some(pipeline) = self.pipeline.as_ref() else { return };
         let Some(bind_group) = self.bind_group.as_ref() else { return };
         let Some(quad_vbo) = self.quad_vbo.as_ref() else { return };
@@ -125,6 +122,7 @@ impl RectRenderer {
         rpass.set_vertex_buffer(0, quad_vbo.slice(..));
         rpass.set_vertex_buffer(1, instance_vbo.slice(..));
         rpass.set_index_buffer(quad_ibo.slice(..), wgpu::IndexFormat::Uint16);
+        // instance_vbo is a local; wgpu holds a ref internally until GPU completes
 
         // Draw one instanced call per consecutive clip-rect group.
         let mut i = 0u32;
@@ -281,22 +279,6 @@ impl RectRenderer {
         ctx.queue.write_buffer(ubo, 0, bytemuck::bytes_of(&u));
     }
 
-    fn ensure_instance_capacity(&mut self, ctx: &RenderCtx<'_>, required_instances: usize) {
-        if required_instances <= self.instance_capacity && self.instance_vbo.is_some() {
-            return;
-        }
-
-        let new_cap = required_instances.next_power_of_two().max(64);
-        let new_size = (new_cap * std::mem::size_of::<RectInstance>()) as u64;
-
-        self.instance_vbo = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("marduk rect instance vbo"),
-            size: new_size,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        }));
-        self.instance_capacity = new_cap;
-    }
 }
 
 #[repr(C)]
