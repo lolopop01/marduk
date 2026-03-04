@@ -5,6 +5,7 @@ use marduk_engine::scene::Border;
 use marduk_engine::text::FontId;
 
 use crate::constraints::{Constraints, Edges, LayoutCtx};
+use crate::cursor::CursorIcon;
 use crate::event::{EventResult, UiEvent};
 use crate::focus::FocusId;
 use crate::painter::Painter;
@@ -182,6 +183,9 @@ impl Widget for TextBox {
     fn paint(&self, painter: &mut Painter, rect: Rect) {
         // Register as focusable so Tab-key cycling can reach this widget.
         painter.register_focusable(self.focus_id);
+        if painter.is_hovered(rect) {
+            painter.set_cursor(CursorIcon::Text);
+        }
 
         // Focused state: either explicitly set (DSL / click) or via FocusManager (Tab cycling).
         let is_focused = self.focused || painter.is_focused(self.focus_id);

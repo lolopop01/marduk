@@ -42,6 +42,7 @@
 
 pub mod app;
 pub mod constraints;
+pub mod cursor;
 pub mod focus;
 pub(crate) mod image_loader;
 
@@ -59,6 +60,7 @@ pub mod widgets;
 pub mod prelude {
     pub use crate::constraints::{Constraints, Edges, LayoutCtx};
     pub use crate::focus::{FocusId, FocusManager};
+    pub use crate::cursor::CursorIcon;
     pub use crate::event::{EventResult, UiEvent};
     pub use crate::painter::Painter;
     pub use crate::scene::{UiInput, UiScene};

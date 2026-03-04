@@ -549,6 +549,9 @@ impl EngineApp for UiAppState {
             _ => {}
         }
 
+        // Apply the cursor shape requested by widgets this frame.
+        ctx.window.set_cursor(self.ui_scene.current_cursor().into());
+
         // ── Dispatch events ───────────────────────────────────────────────
         for event in self.bindings.take_events() {
             if let Some(handler) = self.event_handlers.get_mut(&event) {

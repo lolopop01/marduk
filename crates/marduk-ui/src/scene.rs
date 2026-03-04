@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use marduk_engine::coords::{Rect, Vec2};
@@ -8,6 +8,7 @@ use marduk_engine::scene::DrawList;
 use marduk_engine::text::{FontId, FontSystem};
 
 use crate::constraints::{Constraints, LayoutCtx};
+use crate::cursor::CursorIcon;
 use crate::event::UiEvent;
 use crate::focus::FocusManager;
 use crate::painter::Painter;
@@ -102,6 +103,11 @@ pub struct UiScene {
     /// After paint, the event-routing phase uses this list to dispatch
     /// `OverlayDismiss` when a click misses all registered overlay rects.
     overlay_rects: Rc<RefCell<Vec<Rect>>>,
+    /// Cursor shape requested by widgets this frame.
+    ///
+    /// Reset to `CursorIcon::Default` at the start of each frame.
+    /// Read via [`current_cursor`] after the frame to apply to the OS window.
+    cursor: Rc<Cell<CursorIcon>>,
 }
 
 impl UiScene {
@@ -113,7 +119,16 @@ impl UiScene {
             pixel_ratio: 1.0,
             focus: RefCell::new(FocusManager::new()),
             overlay_rects: Rc::new(RefCell::new(Vec::new())),
+            cursor: Rc::new(Cell::new(CursorIcon::Default)),
         }
+    }
+
+    /// Returns the cursor shape requested by widgets during the last frame.
+    ///
+    /// Call this after [`frame`] / [`frame_ref`] and apply the result to the
+    /// OS window cursor (e.g. via `window.set_cursor(icon.into())`).
+    pub fn current_cursor(&self) -> CursorIcon {
+        self.cursor.get()
     }
 
     /// Load a TrueType / OpenType font from raw bytes.
@@ -155,6 +170,7 @@ impl UiScene {
     ) -> &mut DrawList {
         self.draw_list.clear();
         self.overlay_rects.borrow_mut().clear();
+        self.cursor.set(CursorIcon::Default);
 
         // ── Tab / Escape: advance or clear focus before the paint pass ────
         // This ensures the paint pass sees the correct focus state.
@@ -188,7 +204,8 @@ impl UiScene {
                 self.pixel_ratio,
                 input.time_ms,
             ).with_focus(&self.focus)
-             .with_overlays(Rc::clone(&self.overlay_rects));
+             .with_overlays(Rc::clone(&self.overlay_rects))
+             .with_cursor(Rc::clone(&self.cursor));
             root.paint(&mut painter, rect);
         }
 
@@ -291,6 +308,7 @@ impl UiScene {
     ) -> &mut DrawList {
         self.draw_list.clear();
         self.overlay_rects.borrow_mut().clear();
+        self.cursor.set(CursorIcon::Default);
 
         // ── Tab / Escape: advance or clear focus before the paint pass ────
         for key in &input.keys_pressed {
@@ -323,7 +341,8 @@ impl UiScene {
                 self.pixel_ratio,
                 input.time_ms,
             ).with_focus(&self.focus)
-             .with_overlays(Rc::clone(&self.overlay_rects));
+             .with_overlays(Rc::clone(&self.overlay_rects))
+             .with_cursor(Rc::clone(&self.cursor));
             root.paint(&mut painter, rect);
         }
 

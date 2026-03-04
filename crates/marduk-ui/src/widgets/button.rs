@@ -3,6 +3,7 @@ use marduk_engine::paint::{Color, Paint};
 use marduk_engine::scene::Border;
 
 use crate::constraints::{inset_rect, Constraints, Edges, LayoutCtx};
+use crate::cursor::CursorIcon;
 use crate::event::{EventResult, UiEvent};
 use crate::painter::Painter;
 use crate::widget::{Element, Widget};
@@ -121,6 +122,9 @@ impl Widget for Button {
         };
 
         painter.fill_rounded_rect(rect, self.corner_radius, Paint::Solid(bg), self.border.clone());
+        if painter.is_hovered(rect) {
+            painter.set_cursor(CursorIcon::Pointer);
+        }
         self.child.paint(painter, inset_rect(rect, self.padding));
     }
 

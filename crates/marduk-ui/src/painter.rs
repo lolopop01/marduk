@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use marduk_engine::coords::{CornerRadii, Rect, Vec2};
@@ -8,6 +8,7 @@ use marduk_engine::scene::{Border, DrawList, ZIndex};
 use marduk_engine::text::{FontId, FontSystem};
 
 use crate::constraints::LayoutCtx;
+use crate::cursor::CursorIcon;
 use crate::focus::{FocusId, FocusManager};
 
 /// Drawing surface passed to [`Widget::paint`].
@@ -39,6 +40,11 @@ pub struct Painter<'a> {
     /// Widgets with open popups call [`register_overlay`] to declare the popup
     /// rect.  After paint, the scene uses this list for click-routing decisions.
     overlays: Option<Rc<RefCell<Vec<Rect>>>>,
+    /// Cursor shape requested by widgets this frame.
+    ///
+    /// Widgets call [`set_cursor`] during paint when hovered.  The last call
+    /// wins; the scene reads this after the paint pass and forwards it to the OS.
+    cursor: Option<Rc<Cell<CursorIcon>>>,
     /// Monotonic application time in milliseconds. Matches [`UiInput::time_ms`].
     pub time_ms: u64,
 }
@@ -63,6 +69,7 @@ impl<'a> Painter<'a> {
             mouse_pressed,
             focus: None,
             overlays: None,
+            cursor: None,
             time_ms,
         }
     }
@@ -74,6 +81,11 @@ impl<'a> Painter<'a> {
 
     pub(crate) fn with_overlays(mut self, overlays: Rc<RefCell<Vec<Rect>>>) -> Self {
         self.overlays = Some(overlays);
+        self
+    }
+
+    pub(crate) fn with_cursor(mut self, cursor: Rc<Cell<CursorIcon>>) -> Self {
+        self.cursor = Some(cursor);
         self
     }
 
@@ -168,6 +180,25 @@ impl<'a> Painter<'a> {
         f(self);
         self.z = old_z;
         self.draw_list.restore_clips(saved_clips);
+    }
+
+    // ── cursor ────────────────────────────────────────────────────────────
+
+    /// Request the given cursor shape for this frame.
+    ///
+    /// Call this during [`Widget::paint`] when the mouse is over the widget.
+    /// The last call wins; the OS cursor is updated after the full paint pass.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// if painter.is_hovered(rect) {
+    ///     painter.set_cursor(CursorIcon::Pointer);
+    /// }
+    /// ```
+    pub fn set_cursor(&mut self, icon: CursorIcon) {
+        if let Some(cell) = &self.cursor {
+            cell.set(icon);
+        }
     }
 
     // ── layout context ────────────────────────────────────────────────────

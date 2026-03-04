@@ -2,6 +2,7 @@ use marduk_engine::coords::{Rect, Vec2};
 use marduk_engine::paint::Color;
 
 use crate::constraints::{Constraints, LayoutCtx};
+use crate::cursor::CursorIcon;
 use crate::event::{EventResult, UiEvent};
 use crate::painter::Painter;
 use crate::widget::{Element, Widget};
@@ -207,12 +208,20 @@ impl Widget for Splitter {
         // Hover detection uses the wider grab_rect so the highlight activates
         // before the cursor is precisely over the 4 px bar.
         let grab = self.grab_rect(handle_rect);
-        let handle_color = if self.dragging || painter.is_hovered(grab) {
+        let hovered = self.dragging || painter.is_hovered(grab);
+        let handle_color = if hovered {
             Color::from_srgb(0.45, 0.45, 0.50, 1.0)
         } else {
             Color::from_srgb(0.25, 0.25, 0.28, 1.0)
         };
         painter.fill_rect(handle_rect, handle_color);
+        if hovered {
+            let cursor = match self.direction {
+                SplitDirection::Horizontal => CursorIcon::EwResize,
+                SplitDirection::Vertical   => CursorIcon::NsResize,
+            };
+            painter.set_cursor(cursor);
+        }
     }
 
     fn on_event(&mut self, event: &UiEvent, rect: Rect, ctx: &LayoutCtx<'_>) -> EventResult {
