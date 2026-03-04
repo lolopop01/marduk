@@ -118,7 +118,13 @@ impl Splitter {
         match self.direction {
             SplitDirection::Horizontal => {
                 let total_w = rect.size.x;
-                let first_w = (total_w * self.ratio - hs * 0.5).max(0.0);
+                let usable = (total_w - hs).max(0.0);
+                let raw = total_w * self.ratio - hs * 0.5;
+                let first_w = if usable > self.min_first + self.min_second {
+                    raw.clamp(self.min_first, usable - self.min_second)
+                } else {
+                    raw.max(0.0)
+                };
                 let second_w = (total_w - first_w - hs).max(0.0);
                 let first_rect  = Rect::new(rect.origin.x, rect.origin.y, first_w, rect.size.y);
                 let handle_rect = Rect::new(rect.origin.x + first_w, rect.origin.y, hs, rect.size.y);
@@ -127,7 +133,13 @@ impl Splitter {
             }
             SplitDirection::Vertical => {
                 let total_h = rect.size.y;
-                let first_h  = (total_h * self.ratio - hs * 0.5).max(0.0);
+                let usable = (total_h - hs).max(0.0);
+                let raw = total_h * self.ratio - hs * 0.5;
+                let first_h = if usable > self.min_first + self.min_second {
+                    raw.clamp(self.min_first, usable - self.min_second)
+                } else {
+                    raw.max(0.0)
+                };
                 let second_h = (total_h - first_h - hs).max(0.0);
                 let first_rect  = Rect::new(rect.origin.x, rect.origin.y, rect.size.x, first_h);
                 let handle_rect = Rect::new(rect.origin.x, rect.origin.y + first_h, rect.size.x, hs);
