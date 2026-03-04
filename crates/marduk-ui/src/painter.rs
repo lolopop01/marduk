@@ -170,16 +170,36 @@ impl<'a> Painter<'a> {
     /// Execute `f` with the Z-index boosted to the overlay layer.
     ///
     /// All draw calls inside `f` will appear above all regular widget content.
-    /// The clip stack is also cleared so overlay content (e.g. combobox dropdowns)
-    /// can render outside their parent container's scissor region.
-    /// Both the Z-index and the clip stack are restored after `f` returns.
+    /// The clip stack and transform stack are both cleared so overlay content
+    /// (e.g. combobox dropdowns) renders in screen space, outside any parent
+    /// scissor region or ZoomView transform.
+    /// Both stacks and the Z-index are restored after `f` returns.
     pub fn overlay_scope(&mut self, f: impl FnOnce(&mut Painter)) {
         let old_z = self.z;
-        let saved_clips = self.draw_list.take_clips();
+        let saved_clips      = self.draw_list.take_clips();
+        let saved_transforms = self.draw_list.take_transforms();
         self.z = 100_000;
         f(self);
         self.z = old_z;
         self.draw_list.restore_clips(saved_clips);
+        self.draw_list.restore_transforms(saved_transforms);
+    }
+
+    // ── coordinate transform ──────────────────────────────────────────────
+
+    /// Push a coordinate transform for subsequent draw commands.
+    ///
+    /// `scale` and `offset` are in the **current** draw coordinate space.
+    /// Every draw call made after this will have `screen = content * scale + offset` applied.
+    ///
+    /// Must be paired with a matching [`pop_transform`].
+    pub fn push_transform(&mut self, scale: f32, offset: marduk_engine::coords::Vec2) {
+        self.draw_list.push_transform(scale, offset);
+    }
+
+    /// Pop the most recently pushed coordinate transform.
+    pub fn pop_transform(&mut self) {
+        self.draw_list.pop_transform();
     }
 
     // ── cursor ────────────────────────────────────────────────────────────

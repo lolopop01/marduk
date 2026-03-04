@@ -31,6 +31,16 @@ impl DrawList {
         paint: Paint,
         border: Option<Border>,
     ) {
+        let scale  = self.current_transform().1;
+        let rect   = self.tx_rect(rect);
+        let radii  = CornerRadii {
+            top_left:     radii.top_left     * scale,
+            top_right:    radii.top_right    * scale,
+            bottom_right: radii.bottom_right * scale,
+            bottom_left:  radii.bottom_left  * scale,
+        };
+        let paint  = self.tx_paint(paint);
+        let border = self.tx_border(border);
         self.push(z, DrawCmd::RoundedRect(RoundedRectCmd::new(rect, radii, paint, border)));
     }
 

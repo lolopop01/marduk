@@ -29,6 +29,9 @@ impl DrawList {
         origin: Vec2,
         max_width: Option<f32>,
     ) {
+        let origin    = self.tx_pos(origin);
+        let size      = self.tx_f32(size);
+        let max_width = max_width.map(|w| self.tx_f32(w));
         self.push(z, DrawCmd::Text(TextCmd {
             text: text.into(),
             font,

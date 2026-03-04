@@ -243,7 +243,7 @@ impl UiScene {
                 root.on_event(&UiEvent::KeyPress { key: *key, modifiers: input.modifiers }, rect, &ctx);
             }
             if input.scroll_delta != 0.0 {
-                root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta }, rect, &ctx);
+                root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta, modifiers: input.modifiers }, rect, &ctx);
             }
         }
 
@@ -379,7 +379,7 @@ impl UiScene {
                 root.on_event(&UiEvent::KeyPress { key: *key, modifiers: input.modifiers }, rect, &ctx);
             }
             if input.scroll_delta != 0.0 {
-                root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta }, rect, &ctx);
+                root.on_event(&UiEvent::ScrollWheel { delta: input.scroll_delta, modifiers: input.modifiers }, rect, &ctx);
             }
         }
 

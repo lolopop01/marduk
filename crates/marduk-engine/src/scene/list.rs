@@ -1,4 +1,6 @@
-use crate::coords::Rect;
+use crate::coords::{Rect, Vec2};
+use crate::paint::Paint;
+use crate::scene::shapes::Border;
 
 use super::{DrawCmd, SortKey, ZIndex};
 
@@ -45,6 +47,17 @@ pub struct DrawList {
     /// Set via [`set_z_range`] / [`reset_z_range`] from the render loop to implement
     /// two-pass rendering (normal content first, overlay content second).
     z_filter: Option<(i32, i32)>,
+
+    /// Stack of composed absolute transforms applied to draw-command coordinates.
+    ///
+    /// Each entry `(offset, scale)` represents the mapping: `screen = content * scale + offset`.
+    /// Entries are composed on push so the active entry is always an absolute screen-space
+    /// transform, not a relative one.  When empty the identity transform is implied.
+    ///
+    /// `push_transform` / `pop_transform` are the public API.  Shape push helpers call
+    /// [`tx_pos`] / [`tx_rect`] / [`tx_f32`] / [`tx_paint`] / [`tx_border`] when recording
+    /// draw commands so ZoomView-zoomed content is correctly mapped to screen pixels.
+    transform_stack: Vec<(Vec2, f32)>,
 }
 
 impl DrawList {
@@ -53,7 +66,8 @@ impl DrawList {
         Self::default()
     }
 
-    /// Clears recorded items and the clip stack. Keeps allocated capacity for reuse.
+    /// Clears recorded items, the clip stack, and the transform stack.
+    /// Keeps allocated capacity for reuse.
     #[inline]
     pub fn clear(&mut self) {
         self.items.clear();
@@ -61,6 +75,7 @@ impl DrawList {
         self.sorted_dirty = true;
         self.sorted_indices.clear();
         self.clip_stack.clear();
+        self.transform_stack.clear();
     }
 
     /// Returns items in insertion order.
@@ -89,14 +104,18 @@ impl DrawList {
     /// Begins a scissor region. All draw commands pushed until [`pop_clip`] are clipped
     /// to `rect` (intersected with any parent clip rect).
     ///
+    /// `rect` is in the current draw coordinate space and is automatically transformed
+    /// to screen space when a [`push_transform`] is active.
+    ///
     /// Calls must be balanced with [`pop_clip`].
     #[inline]
     pub fn push_clip(&mut self, rect: Rect) {
+        let screen_rect = self.tx_rect(rect);
         let effective = match self.clip_stack.last() {
-            None => rect,
+            None => screen_rect,
             // Intersect with the parent; if no overlap, produce a zero-area rect so
             // the renderer skips those draw calls.
-            Some(&parent) => parent.intersect(rect).unwrap_or(Rect::new(0.0, 0.0, 0.0, 0.0)),
+            Some(&parent) => parent.intersect(screen_rect).unwrap_or(Rect::new(0.0, 0.0, 0.0, 0.0)),
         };
         self.clip_stack.push(effective);
     }
@@ -124,6 +143,112 @@ impl DrawList {
     #[inline]
     pub fn restore_clips(&mut self, clips: Vec<Rect>) {
         self.clip_stack = clips;
+    }
+
+    // ── coordinate transform ───────────────────────────────────────────────
+
+    /// Push a coordinate transform for subsequent draw commands.
+    ///
+    /// `scale` and `offset` are in the **current** draw coordinate space (before this push).
+    /// The mapping applied to every draw-command coordinate is:
+    /// `screen = content * scale + offset`.
+    ///
+    /// Transforms compose: pushing inside an already-transformed context multiplies
+    /// scale and adds the offset adjusted by the outer scale, so nested `ZoomView`
+    /// containers work correctly.
+    ///
+    /// Must be paired with a matching [`pop_transform`].
+    #[inline]
+    pub fn push_transform(&mut self, scale: f32, offset: Vec2) {
+        let composed = if let Some(&(cur_off, cur_scale)) = self.transform_stack.last() {
+            // Compose: new_abs_offset = offset * cur_scale + cur_offset
+            let abs_offset = Vec2::new(
+                offset.x * cur_scale + cur_off.x,
+                offset.y * cur_scale + cur_off.y,
+            );
+            (abs_offset, scale * cur_scale)
+        } else {
+            (offset, scale)
+        };
+        self.transform_stack.push(composed);
+    }
+
+    /// Pop the most recently pushed coordinate transform.
+    #[inline]
+    pub fn pop_transform(&mut self) {
+        debug_assert!(!self.transform_stack.is_empty(), "pop_transform called without matching push_transform");
+        self.transform_stack.pop();
+    }
+
+    /// Remove and return the entire transform stack.
+    ///
+    /// Use together with [`restore_transforms`] to temporarily escape all
+    /// active coordinate transforms (e.g. for overlay / popup draws that
+    /// must render in screen space).
+    #[inline]
+    pub fn take_transforms(&mut self) -> Vec<(Vec2, f32)> {
+        std::mem::take(&mut self.transform_stack)
+    }
+
+    /// Restore a transform stack previously saved with [`take_transforms`].
+    #[inline]
+    pub fn restore_transforms(&mut self, transforms: Vec<(Vec2, f32)>) {
+        self.transform_stack = transforms;
+    }
+
+    // ── transform helpers (used by shape push methods) ─────────────────────
+
+    /// Current absolute screen-space transform `(offset, scale)`.
+    /// Returns the identity `(Vec2::ZERO, 1.0)` when the stack is empty.
+    #[inline]
+    pub(crate) fn current_transform(&self) -> (Vec2, f32) {
+        self.transform_stack.last().copied().unwrap_or((Vec2::new(0.0, 0.0), 1.0))
+    }
+
+    /// Map a content-space position to screen space.
+    #[inline]
+    pub(crate) fn tx_pos(&self, p: Vec2) -> Vec2 {
+        let (off, scale) = self.current_transform();
+        Vec2::new(p.x * scale + off.x, p.y * scale + off.y)
+    }
+
+    /// Map a content-space rect to screen space (origin and size both scaled).
+    #[inline]
+    pub(crate) fn tx_rect(&self, r: Rect) -> Rect {
+        let (off, scale) = self.current_transform();
+        Rect::new(
+            r.origin.x * scale + off.x,
+            r.origin.y * scale + off.y,
+            r.size.x * scale,
+            r.size.y * scale,
+        )
+    }
+
+    /// Scale a content-space scalar (size, radius, width…) to screen space.
+    #[inline]
+    pub(crate) fn tx_f32(&self, v: f32) -> f32 {
+        let (_, scale) = self.current_transform();
+        v * scale
+    }
+
+    /// Transform gradient start/end positions inside a `Paint`.
+    /// `Solid` paints pass through unchanged.
+    #[inline]
+    pub(crate) fn tx_paint(&self, paint: Paint) -> Paint {
+        match paint {
+            Paint::Solid(_) => paint,
+            Paint::LinearGradient(mut g) => {
+                g.start = self.tx_pos(g.start);
+                g.end   = self.tx_pos(g.end);
+                Paint::LinearGradient(g)
+            }
+        }
+    }
+
+    /// Scale a border's width. Returns `None` when `border` is `None`.
+    #[inline]
+    pub(crate) fn tx_border(&self, border: Option<Border>) -> Option<Border> {
+        border.map(|b| Border::new(self.tx_f32(b.width), b.color))
     }
 
     /// Returns indices into `items` in paint order (back-to-front).

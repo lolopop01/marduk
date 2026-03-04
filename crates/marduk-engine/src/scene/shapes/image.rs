@@ -34,6 +34,14 @@ impl DrawList {
         tint_straight: [f32; 4],
         corner_radii: CornerRadii,
     ) {
+        let scale = self.current_transform().1;
+        let rect  = self.tx_rect(rect);
+        let corner_radii = CornerRadii {
+            top_left:     corner_radii.top_left     * scale,
+            top_right:    corner_radii.top_right    * scale,
+            bottom_right: corner_radii.bottom_right * scale,
+            bottom_left:  corner_radii.bottom_left  * scale,
+        };
         self.push(
             z,
             DrawCmd::Image(ImageCmd {

@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use marduk_engine::coords::Vec2;
 use marduk_engine::image::ImageId;
 use marduk_engine::paint::{Color, Paint};
 use marduk_engine::scene::Border;
@@ -47,6 +48,7 @@ use crate::widgets::{
     textbox::TextBox,
     toggle::Toggle,
     tooltip::Tooltip,
+    zoom_view::ZoomView,
 };
 
 // ── WidgetStateValue ──────────────────────────────────────────────────────
@@ -191,6 +193,7 @@ impl DslLoader {
             "Tooltip"     => self.build_tooltip(node, bindings),
             "Modal"       => self.build_modal(node, bindings),
             "Combobox"    => self.build_combobox(node, bindings),
+            "ZoomView"    => self.build_zoom_view(node, bindings),
             alias => {
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
@@ -1132,6 +1135,70 @@ impl DslLoader {
         }
 
         cb.into()
+    }
+
+    // ── ZoomView ──────────────────────────────────────────────────────────
+
+    fn build_zoom_view(&self, node: &Node, bindings: &DslBindings) -> Element {
+        // State keys: "<id>_zoom", "<id>_pan_x", "<id>_pan_y"
+        let id = node.prop_str("id")
+            .or_else(|| node.prop_str("state_key"))
+            .or_else(|| node.prop_str("on_change"))
+            .map(|s| s.to_string());
+
+        let zoom_key  = id.as_ref().map(|k| format!("{k}_zoom"));
+        let pan_x_key = id.as_ref().map(|k| format!("{k}_pan_x"));
+        let pan_y_key = id.as_ref().map(|k| format!("{k}_pan_y"));
+
+        let get_f = |key: &Option<String>| -> Option<f32> {
+            let k = key.as_ref()?;
+            match bindings.widget_state.borrow().get(k.as_str()) {
+                Some(WidgetStateValue::Float(v)) => Some(*v),
+                _ => None,
+            }
+        };
+
+        let default_zoom  = node.prop_f32("zoom").unwrap_or(1.0);
+        let default_pan_x = node.prop_f32("pan_x").unwrap_or(0.0);
+        let default_pan_y = node.prop_f32("pan_y").unwrap_or(0.0);
+
+        let zoom  = get_f(&zoom_key ).unwrap_or(default_zoom);
+        let pan_x = get_f(&pan_x_key).unwrap_or(default_pan_x);
+        let pan_y = get_f(&pan_y_key).unwrap_or(default_pan_y);
+
+        let child: Element = if let Some(child_node) = node.children.first() {
+            self.build_node(child_node, bindings)
+        } else {
+            Container::new().into()
+        };
+
+        let mut zv = ZoomView::new(child)
+            .zoom(zoom)
+            .pan(Vec2::new(pan_x, pan_y));
+
+        if let Some(v) = node.prop_f32("min_zoom")   { zv = zv.min_zoom(v); }
+        if let Some(v) = node.prop_f32("max_zoom")   { zv = zv.max_zoom(v); }
+        if let Some(v) = node.prop_f32("zoom_step")  { zv = zv.zoom_step(v); }
+        if let Some(v) = node.prop_f32("pan_speed")  { zv = zv.pan_speed(v); }
+
+        if let Some(event_name) = node.prop_str("on_change") {
+            let queue  = Rc::clone(&bindings.event_queue);
+            let state  = Rc::clone(&bindings.widget_state);
+            let zk     = zoom_key .unwrap_or_else(|| format!("{event_name}_zoom"));
+            let pxk    = pan_x_key.unwrap_or_else(|| format!("{event_name}_pan_x"));
+            let pyk    = pan_y_key.unwrap_or_else(|| format!("{event_name}_pan_y"));
+            let name   = event_name.to_string();
+            zv = zv.on_change(move |z, p| {
+                let mut st = state.borrow_mut();
+                st.insert(zk.clone(),  WidgetStateValue::Float(z));
+                st.insert(pxk.clone(), WidgetStateValue::Float(p.x));
+                st.insert(pyk.clone(), WidgetStateValue::Float(p.y));
+                drop(st);
+                queue.borrow_mut().push(name.clone());
+            });
+        }
+
+        zv.into()
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

@@ -1,32 +1,88 @@
-# marduk
+# Marduk
 
-A Rust UI framework built on wgpu, with a declarative markup language (`.mkml`), a retained widget system, and a language server.
+**Marduk** is a lightweight Rust UI framework built on **wgpu**, featuring:
 
-## Workspace
+* a declarative markup language (`.mkml`)
+* a retained widget system
+* a language server for editor integration
 
-| Crate | Description |
-|---|---|
+Marduk aims to solve a common problem in UI frameworks:
+
+> Most UI systems are either **huge**, **too simple**, or **painful to use**.
+
+Marduk is built around a simple philosophy:
+
+```
+            Capability
+               ▲
+              / \
+             /   \
+            /     \
+           /       \
+          /         \
+         /           \
+        /             \
+       /               \
+      /                 \
+     /                   \
+    ▼                     ▼
+Simplicity ----------- Performance
+```
+
+This is the **UI Trinity**.
+
+Most frameworks choose two:
+
+| Framework        | Capability | Simplicity | Performance |
+| ---------------- | ---------- | ---------- | ----------- |
+| Qt / GTK         | ✅          | ✅          | ❌           |
+| Electron / React | ✅          | ✅          | ❌           |
+| Raw GPU UI       | ✅          | ❌          | ✅           |
+| Minimal toolkits | ❌          | ✅          | ✅           |
+
+**Marduk aims for the center of the triangle**:
+
+* powerful enough for real applications
+* simple enough to learn quickly
+* lightweight enough to stay fast and dependency-minimal
+
+The core philosophy is:
+
+> **Small engine. Powerful primitives. Composable UI.**
+
+---
+
+# Workspace
+
+| Crate           | Description                                                                          |
+| --------------- | ------------------------------------------------------------------------------------ |
 | `marduk-engine` | Platform + GPU runtime (wgpu, winit). Handles windowing, rendering, input, and text. |
-| `marduk-mkml` | Zero-dependency lexer/parser/AST for the `.mkml` markup language. |
-| `marduk-ui` | Widget system and DSL builder on top of the engine. |
-| `marduk-studio` | Demo binary — a "Mission Control" UI that exercises all widgets. |
-| `marduk-lsp` | Language server for `.mkml` files (hover, completion, diagnostics). |
+| `marduk-mkml`   | Zero-dependency lexer/parser/AST for the `.mkml` markup language.                    |
+| `marduk-ui`     | Widget system and DSL builder on top of the engine.                                  |
+| `marduk-studio` | Demo binary — a "Mission Control" UI that exercises all widgets.                     |
+| `marduk-lsp`    | Language server for `.mkml` files (hover, completion, diagnostics).                  |
 
-## Running
+---
+
+# Running
 
 ```bash
-# Demo app
+# Demo application
 cargo run -p marduk-studio
 
 # Language server (stdio — point your editor at this)
 cargo run -p marduk-lsp
 ```
 
-## The `.mkml` markup language
+---
 
-UI layouts are described in `.mkml` files — a whitespace-sensitive format inspired by CSS and YAML:
+# The `.mkml` markup language
 
-```
+UI layouts are written in **`.mkml`**, a brace-based markup format inspired by **CSS, YAML, and UI DSLs**.
+
+Example:
+
+```mkml
 // main.mkml
 import "sidebar.mkml" as Sidebar
 
@@ -34,41 +90,74 @@ Column {
     gap: 8
     bg: #1a1a2eff
 
-    Text "Hello, world!" { color: #ffffffff  size: 20 }
+    Text "Hello, world!" { color: #ffffffff size: 20 }
 
     Row {
         gap: 12
-        Button "Launch" { on_click: launch  corner_radius: 6  bg: #4c6ef5ff }
-        Button "Abort"  { on_click: abort   corner_radius: 6  bg: #e03131ff }
+
+        Button "Launch" {
+            on_click: launch
+            corner_radius: 6
+            bg: #4c6ef5ff
+        }
+
+        Button "Abort" {
+            on_click: abort
+            corner_radius: 6
+            bg: #e03131ff
+        }
     }
 
     Sidebar { }
 }
 ```
 
-- **No commas, semicolons, or angle brackets**
-- Colors: `#rrggbbaa` (8 hex digits, straight alpha)
-- `import "file.mkml" as Alias` at top; use `Alias { }` anywhere below
-- Comments: `// ...`
+Design goals of `.mkml`:
 
-### Supported widgets
+* **No commas, semicolons, or angle brackets**
+* minimal punctuation
+* readable UI structure
+* easy to parse and lint
+
+### Syntax notes
+
+* Colors: `#rrggbb` or `#rrggbbaa` (6 or 8 hex digits, straight alpha)
+* Imports: `import "file.mkml" as Alias`
+* Comments: `// comment`
+
+---
+
+# Supported widgets
+
+Widgets currently supported by the `.mkml` builder:
 
 | Widget | Purpose |
-|---|---|
-| `Text` | Single line of text |
-| `Container` | Box with one child; supports padding, background, border, corner radius |
-| `Column` / `Row` | Vertical / horizontal flex layout |
-| `Button` | Pressable button with hover + press states |
+| --- | --- |
+| `Text` | Single-line text |
+| `Container` | One-child box with padding/background/border/radius |
+| `Column` / `Row` | Vertical / horizontal layout |
+| `Button` | Clickable button |
 | `Checkbox` | Labelled checkbox |
 | `Toggle` | On/off switch |
 | `Slider` | Horizontal range slider |
-| `RadioGroup` + `RadioOption` | Mutually-exclusive radio buttons |
+| `RadioGroup` + `RadioOption` | Mutually-exclusive options |
 | `ProgressBar` | Non-interactive fill bar |
 | `TextBox` | Single-line text input |
-| `ScrollView` | Scrollable container with optional scrollbar |
-| `Stack` | Overlay layout with per-child anchor positioning |
+| `ScrollView` | Scrollable container |
+| `Stack` | Overlay layout |
+| `Image` | Displays registered image assets (`src`) |
+| `Tabs` | Tab strip + active tab body |
+| `Splitter` | Resizable two-pane layout |
+| `NumberInput` | Numeric stepper/input |
+| `Tooltip` | Hover tooltip wrapper |
+| `Modal` | Overlay dialog container |
+| `Combobox` | Select dropdown |
 
-### Wiring events in Rust
+These primitives are designed to be composed into larger UI patterns.
+
+---
+
+# Wiring events in Rust
 
 ```rust
 use marduk_ui::Application;
@@ -84,11 +173,24 @@ Application::new()
     .run(include_str!("ui/main.mkml"))
 ```
 
-`on_event` names match `on_click: launch` (and similar) in `.mkml`. `on_event_state` gives access to widget state (read/write TextBox content, Slider values, etc.).
+Event names correspond directly to `.mkml` properties such as:
 
-## Custom widgets
+```
+on_click: launch
+```
 
-Implement `Widget` and drop it anywhere:
+`on_event_state` gives access to widget state:
+
+* TextBox content
+* Slider values
+* Checkbox state
+* etc.
+
+---
+
+# Custom widgets
+
+Marduk supports **custom widgets implemented directly in Rust**.
 
 ```rust
 use marduk_ui::prelude::*;
@@ -99,50 +201,111 @@ impl Widget for MyWidget {
     fn measure(&self, c: Constraints, _ctx: &LayoutCtx) -> Vec2 {
         c.constrain(Vec2::new(200.0, 40.0))
     }
+
     fn paint(&self, painter: &mut Painter, rect: Rect) {
         painter.fill_rounded_rect(
-            rect, 8.0,
+            rect,
+            8.0,
             Paint::Solid(Color::from_straight(0.2, 0.5, 1.0, 1.0)),
             None,
         );
     }
 }
+```
 
-// Use it in a pure-Rust tree:
+Use it in a pure Rust UI tree:
+
+```rust
 Application::new()
     .run_widget(|_fonts| MyWidget.into());
 ```
 
-## Language server
+This allows advanced users to build:
 
-`marduk-lsp` implements the Language Server Protocol over stdio.
+* graph editors
+* canvas tools
+* custom controls
+* visualization widgets
+
+while still using the Marduk engine.
+
+---
+
+# Language server
+
+`marduk-lsp` implements the **Language Server Protocol** for `.mkml`.
 
 Features:
-- **Diagnostics** — parse errors shown inline as you type
-- **Hover** — widget and property documentation on mouse-over
-- **Completion** — widget names, property keys, enum values, and color snippets
 
-Point your editor at `cargo run -p marduk-lsp` with `.mkml` file association.
+* **Diagnostics** — parse errors shown inline
+* **Hover** — widget/property documentation
+* **Completion** — widgets, properties, enums, colors
 
-## Architecture notes
+Point your editor to:
 
-- GPU backend: wgpu (Vulkan / Metal / DX12 / WebGPU)
-- Coordinates: logical pixels, top-left origin, +Y down; shaders convert to NDC via a viewport uniform
-- Colors: premultiplied linear RGBA internally; `Color::from_straight(r,g,b,a)` for straight-alpha input
-- Widget tree is **rebuilt every frame** from the `.mkml` document; stateful widget values (slider position, checkbox state, text) are persisted across rebuilds in `DslBindings::widget_state`
-- Drag tracking lives in `UiAppState` (not in widgets) so it survives the per-frame rebuild
+```
+cargo run -p marduk-lsp
+```
 
-## Building
+with `.mkml` file association.
+
+---
+
+# Architecture notes
+
+**Renderer**
+
+* GPU backend: `wgpu`
+* Supports Vulkan / Metal / DX12 / WebGPU
+
+**Coordinates**
+
+* logical pixels
+* origin: top-left
+* +Y downward
+* shaders convert to NDC using a viewport uniform
+
+**Colors**
+
+* stored internally as **premultiplied linear RGBA**
+* input via `Color::from_straight(r,g,b,a)`
+
+**Widget lifecycle**
+
+The widget tree is **rebuilt every frame** from the `.mkml` document.
+
+Stateful values are preserved via:
+
+```
+DslBindings::widget_state
+```
+
+Examples:
+
+* slider position
+* checkbox state
+* textbox text
+
+Drag tracking is stored in `UiAppState`, allowing it to persist across rebuilds.
+
+---
+
+# Building
 
 ```bash
-cargo build          # debug
+cargo build
 cargo build --release
 
-cargo test           # all crates
+cargo test
 cargo test -p marduk-engine
 
 cargo clippy
 cargo fmt
 ```
 
-Requires a Rust toolchain (edition 2024). The engine links wgpu — on Linux, Vulkan drivers or Mesa are needed.
+Requirements:
+
+* Rust toolchain (edition **2024**)
+* `wgpu` compatible GPU drivers
+
+On Linux, ensure **Vulkan drivers or Mesa** are installed.

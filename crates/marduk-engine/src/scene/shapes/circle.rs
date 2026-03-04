@@ -31,6 +31,10 @@ impl DrawList {
         paint: Paint,
         border: Option<Border>,
     ) {
+        let center = self.tx_pos(center);
+        let radius = self.tx_f32(radius);
+        let paint  = self.tx_paint(paint);
+        let border = self.tx_border(border);
         self.push(z, DrawCmd::Circle(CircleCmd::new(center, radius, paint, border)));
     }
 

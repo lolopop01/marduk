@@ -150,7 +150,7 @@ impl Widget for ScrollView {
         let content_h = self.cached_content_height.get();
 
         match event {
-            UiEvent::ScrollWheel { delta } => {
+            UiEvent::ScrollWheel { delta, .. } => {
                 // Positive delta = scroll down (increase offset to reveal content below).
                 self.apply_scroll(*delta * self.line_height, content_h, rect.size.y);
                 EventResult::Consumed

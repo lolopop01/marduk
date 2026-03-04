@@ -483,22 +483,13 @@ impl EngineApp for UiAppState {
             }
         }
 
-        // ── Ctrl + Scroll → zoom ──────────────────────────────────────────
-        let ctrl = ctx.input.modifiers.ctrl;
         let raw_scroll = ctx.input_frame.scroll_delta;
-        if ctrl && raw_scroll != 0.0 {
-            // Each scroll line zooms by ~10%. Negative delta = scroll down = zoom out.
-            // Exponential scale so fast scrolls can't produce negative zoom.
-            // positive raw_scroll = scroll down = zoom out → negative exponent.
-            self.zoom *= f32::exp(-raw_scroll * 0.1);
-            self.zoom = self.zoom.clamp(0.25, 4.0);
-        }
 
-        // Mouse position in *zoomed* logical space (divide by zoom).
+        // Mouse position in logical space.
         let (mx, my) = ctx.input.pointer_pos.unwrap_or((0.0, 0.0));
         let mouse_pos = Vec2::new(mx / self.zoom, my / self.zoom);
 
-        // Track where the current drag started (in zoomed space).
+        // Track where the current drag started.
         if ctx.input_frame.buttons_pressed.contains(&MouseButton::Left) {
             self.drag_origin = Some(mouse_pos);
         }
@@ -508,7 +499,7 @@ impl EngineApp for UiAppState {
             None
         };
 
-        // Layout viewport = window size / zoom (widgets lay out in this space).
+        // Layout viewport = window size / zoom.
         let ui_viewport = Vec2::new(w / self.zoom, h / self.zoom);
 
         let ui_input = UiInput {
@@ -517,8 +508,9 @@ impl EngineApp for UiAppState {
             mouse_clicked: ctx.input_frame.buttons_released.contains(&MouseButton::Left),
             text_input:    ctx.input_frame.text.iter().map(|t| t.text.clone()).collect(),
             keys_pressed:  ctx.input_frame.keys_pressed.iter().copied().collect(),
-            // Swallow scroll delta when Ctrl is held (it was consumed for zoom).
-            scroll_delta:  if ctrl { 0.0 } else { raw_scroll },
+            // All scroll events (including Ctrl+scroll) reach the widget tree.
+            // ZoomView handles Ctrl+scroll for per-view zoom.
+            scroll_delta:  raw_scroll,
             drag_origin:   self.drag_origin,
             drag_end,
             modifiers:     ctx.input.modifiers,

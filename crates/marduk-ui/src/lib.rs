@@ -86,6 +86,7 @@ pub mod prelude {
         textbox::TextBox,
         toggle::Toggle,
         tooltip::Tooltip,
+        zoom_view::ZoomView,
     };
 
     // Re-export the engine primitives everyone needs.

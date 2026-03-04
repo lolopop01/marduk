@@ -1,8 +1,9 @@
-import "header.mkml"               as Header
-import "components/fleet.mkml"     as Fleet
-import "components/dispatch.mkml"  as Dispatch
-import "components/routing.mkml"   as Routing
-import "components/tools.mkml"     as Tools
+import "header.mkml"                     as Header
+import "components/fleet.mkml"           as Fleet
+import "components/dispatch.mkml"        as Dispatch
+import "components/routing.mkml"         as Routing
+import "components/tools.mkml"           as Tools
+import "components/zoom_canvas.mkml"     as ZoomCanvas
 
 Stack {
     bg: #0e0d0bff
@@ -86,6 +87,19 @@ Stack {
             ScrollView {
                 on_scroll: tools_scroll
                 Tools { }
+            }
+        }
+
+        Tab "CANVAS" {
+            ZoomView {
+                id: canvas_view
+                zoom: 1.0
+                min_zoom: 0.1
+                max_zoom: 8.0
+                zoom_step: 0.15
+                on_change: canvas_zoom_changed
+
+                ZoomCanvas { }
             }
         }
     }

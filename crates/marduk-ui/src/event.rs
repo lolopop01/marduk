@@ -20,7 +20,9 @@ pub enum UiEvent {
     /// Mouse wheel / trackpad scroll.
     ///
     /// `delta` > 0 → scroll down (reveal content below); < 0 → scroll up.
-    ScrollWheel { delta: f32 },
+    /// `modifiers` carries the keyboard modifier state at the time of the scroll
+    /// (useful for distinguishing Ctrl+scroll zoom from plain scroll).
+    ScrollWheel { delta: f32, modifiers: Modifiers },
     /// Primary button released after a drag.
     ///
     /// `pos` is where the button was released; `start` is where the drag began.

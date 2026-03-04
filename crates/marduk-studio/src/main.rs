@@ -25,7 +25,8 @@ fn main() {
         .component("Fleet",   include_str!("../ui/components/fleet.mkml"))
         .component("Dispatch",include_str!("../ui/components/dispatch.mkml"))
         .component("Routing", include_str!("../ui/components/routing.mkml"))
-        .component("Tools",   include_str!("../ui/components/tools.mkml"))
+        .component("Tools",       include_str!("../ui/components/tools.mkml"))
+        .component("ZoomCanvas",  include_str!("../ui/components/zoom_canvas.mkml"))
         // ── OPS tab ───────────────────────────────────────────────────────
         .on_event("main_scroll",              || {})
         .on_event("main_tab_changed",         || {})
@@ -53,6 +54,8 @@ fn main() {
         .on_event("load_limit_changed",       || println!("  [LIMITS] Max load updated."))
         .on_event("speed_limit_changed",      || println!("  [LIMITS] Speed limit updated."))
         .on_event("rest_interval_changed",    || println!("  [LIMITS] Rest interval updated."))
+        // ── CANVAS tab (ZoomView) ──────────────────────────────────────────
+        .on_event("canvas_zoom_changed", || {})
         // ── Modal ──────────────────────────────────────────────────────────
         .on_event_state("open_emergency", |state| {
             state.set_bool("emergency_modal", true);

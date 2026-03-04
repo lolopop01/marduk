@@ -20,6 +20,8 @@ impl DrawList {
     /// Records a rectangle draw command.
     #[inline]
     pub fn push_rect(&mut self, z: ZIndex, rect: Rect, paint: Paint) {
+        let rect  = self.tx_rect(rect);
+        let paint = self.tx_paint(paint);
         self.push(z, DrawCmd::Rect(RectCmd::new(rect, paint)));
     }
 

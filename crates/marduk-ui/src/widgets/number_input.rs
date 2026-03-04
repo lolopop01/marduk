@@ -304,7 +304,7 @@ impl Widget for NumberInput {
                 }
             }
 
-            UiEvent::ScrollWheel { delta } => {
+            UiEvent::ScrollWheel { delta, .. } => {
                 if focused {
                     // Positive delta = scroll down = decrease value.
                     self.step_value(-(*delta as f64).signum());
