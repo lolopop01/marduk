@@ -39,6 +39,8 @@ pub enum UiEvent {
     /// position misses all overlay rects.  Widgets that own open popups
     /// (Combobox, Modal, etc.) should consume this to close themselves.
     OverlayDismiss,
+    /// Secondary (right) mouse button pressed and released at `pos`.
+    RightClick { pos: Vec2 },
 }
 
 /// Result returned by [`Widget::on_event`].

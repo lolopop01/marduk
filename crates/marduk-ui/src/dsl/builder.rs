@@ -81,6 +81,10 @@ pub struct DslBindings {
     /// Persisted cursor/anchor/scroll state for TextBox widgets.
     /// Keyed by `state_key`; value is `(cursor_byte, anchor_byte, scroll_offset)`.
     pub text_edit_states: Rc<RefCell<HashMap<String, (usize, usize, f32)>>>,
+    /// Named Rust widget factories embedded in the DSL tree via `Native { id: "name" }`.
+    ///
+    /// Each slot is called once per frame to produce the live `Element`.
+    pub native_slots: HashMap<String, Rc<dyn Fn() -> Element>>,
 }
 
 impl DslBindings {
@@ -92,6 +96,7 @@ impl DslBindings {
             widget_state:     Rc::new(RefCell::new(HashMap::new())),
             focused_widget:   Rc::new(RefCell::new(None)),
             text_edit_states: Rc::new(RefCell::new(HashMap::new())),
+            native_slots:     HashMap::new(),
         }
     }
 
@@ -107,6 +112,7 @@ impl DslBindings {
             widget_state,
             focused_widget:   Rc::new(RefCell::new(None)),
             text_edit_states: Rc::new(RefCell::new(HashMap::new())),
+            native_slots:     HashMap::new(),
         }
     }
 
@@ -194,6 +200,7 @@ impl DslLoader {
             "Modal"       => self.build_modal(node, bindings),
             "Combobox"    => self.build_combobox(node, bindings),
             "ZoomView"    => self.build_zoom_view(node, bindings),
+            "Native"      => self.build_native(node, bindings),
             alias => {
                 if let Some(component) = self.registry.get(alias) {
                     self.build_node(&component.root, bindings)
@@ -1280,6 +1287,22 @@ impl DslLoader {
             c.border(Border::new(bw, bc))
         } else {
             c
+        }
+    }
+
+    // ── Native ──────────────────────────────────────────────────────────
+
+    fn build_native(&self, node: &Node, bindings: &DslBindings) -> Element {
+        let id = match node.prop("id") {
+            Some(Value::Ident(s) | Value::Str(s)) => s.clone(),
+            _ => return Container::new().into(),
+        };
+        if let Some(slot) = bindings.native_slots.get(&id) {
+            slot()
+        } else {
+            #[cfg(debug_assertions)]
+            eprintln!("marduk-ui: native slot '{id}' not registered");
+            Container::new().into()
         }
     }
 }

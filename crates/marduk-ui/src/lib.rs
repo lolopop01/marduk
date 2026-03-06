@@ -86,6 +86,7 @@ pub mod prelude {
         textbox::TextBox,
         toggle::Toggle,
         tooltip::Tooltip,
+        tree::{TreeNode, TreeView},
         zoom_view::ZoomView,
     };
 

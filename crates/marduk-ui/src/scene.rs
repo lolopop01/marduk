@@ -40,6 +40,8 @@ pub struct UiInput {
     /// Set to `Some(start)` for the single frame in which a drag ends (button released).
     /// Used to dispatch `DragEnd` so widgets can commit regardless of release position.
     pub drag_end: Option<Vec2>,
+    /// `true` for exactly one frame when the secondary (right) mouse button is released.
+    pub right_clicked: bool,
     /// Monotonic application time in milliseconds (from app startup).
     ///
     /// Used by time-dependent widgets (e.g. `Tooltip`) to measure hover duration.
@@ -236,6 +238,9 @@ impl UiScene {
                     root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
                 }
             }
+            if input.right_clicked {
+                root.on_event(&UiEvent::RightClick { pos: input.mouse_pos }, rect, &ctx);
+            }
             for text in &input.text_input {
                 root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);
             }
@@ -371,6 +376,9 @@ impl UiScene {
                     drop(overlays);
                     root.on_event(&UiEvent::Click { pos: input.mouse_pos }, rect, &ctx);
                 }
+            }
+            if input.right_clicked {
+                root.on_event(&UiEvent::RightClick { pos: input.mouse_pos }, rect, &ctx);
             }
             for text in &input.text_input {
                 root.on_event(&UiEvent::TextInput { text: text.clone() }, rect, &ctx);

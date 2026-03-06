@@ -38,6 +38,8 @@ pub struct ScrollView {
     cached_content_height: Cell<f32>,
     /// Called when the scroll offset changes (for DSL state persistence).
     on_scroll: Option<Box<dyn FnMut(f32)>>,
+    /// Whether the mouse is currently inside this scroll view's rect.
+    hovered: bool,
 }
 
 impl ScrollView {
@@ -49,6 +51,7 @@ impl ScrollView {
             show_scrollbar: true,
             cached_content_height: Cell::new(0.0),
             on_scroll: None,
+            hovered: false,
         }
     }
 
@@ -150,7 +153,16 @@ impl Widget for ScrollView {
         let content_h = self.cached_content_height.get();
 
         match event {
+            UiEvent::Hover { pos } => {
+                self.hovered = rect.contains(*pos);
+                let content_rect = self.content_rect(rect, content_h);
+                self.child.on_event(event, content_rect, ctx)
+            }
+
             UiEvent::ScrollWheel { delta, .. } => {
+                if !self.hovered {
+                    return EventResult::Ignored;
+                }
                 // Positive delta = scroll down (increase offset to reveal content below).
                 self.apply_scroll(*delta * self.line_height, content_h, rect.size.y);
                 EventResult::Consumed

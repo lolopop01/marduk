@@ -18,4 +18,5 @@ pub mod text_edit;
 pub mod textbox;
 pub mod toggle;
 pub mod tooltip;
+pub mod tree;
 pub mod zoom_view;
